@@ -1,0 +1,68 @@
+name: j3tunes
+description: Music Streaming app made in Flutter!
+
+
+publish_to: 'none'
+version: 1.0.1+2 
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.13.0 <4.0.0'
+
+dependencies:
+  app_links: 
+  audio_service: 
+  audio_session: 
+  cached_network_image: 
+  dynamic_color: 
+  file_picker: 
+  fluentui_system_icons: 
+  flutter:
+    sdk: flutter
+  flutter_flip_card: 
+  flutter_localizations:
+    sdk: flutter
+  go_router: 
+  hive: 
+  hive_flutter: 
+  html:
+  http:
+  intl: 
+  just_audio:
+  rxdart: 
+  url_launcher: 
+  youtube_explode_dart:
+  shared_preferences: 
+  image_picker: 
+  path_provider:
+  # home_widget: 
+  # workmanager: 
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  translations_cleaner: 
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  generate: true
+  uses-material-design: true
+
+  # To add assets to your application, add an assets section, like this:
+  assets:
+    - assets/licenses/
+    - assets/images/
+
+  fonts:
+    - family: paytoneOne
+      fonts:
+        - asset: fonts/paytone/PaytoneOne-Regular.ttf
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/JTunes.png"
+  adaptive_icon_foreground: "assets/images/JTunes.png"
+  adaptive_icon_background: "#FFFFFF"  # Default white
+  adaptive_icon_monochrome: "assets/images/JTunes.png"  # For themed icons
+  remove_alpha_ios: false
