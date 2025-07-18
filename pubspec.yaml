@@ -41,6 +41,7 @@ dependencies:
   jiosaavn:  
   home_widget: 
   workmanager: 
+  youtube_player_flutter: ^9.1.1
  
 
 dev_dependencies:
