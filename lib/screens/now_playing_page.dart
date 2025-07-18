@@ -1,3 +1,5 @@
+// ignore_for_file: directives_ordering
+
 /*
  *     Copyright (C) 2025 Valeri Gokadze
  *
@@ -510,6 +512,41 @@ class PlayerControlButtons extends StatelessWidget {
     final _primaryColor = theme.colorScheme.primary;
     final _secondaryColor = theme.colorScheme.secondaryContainer;
 
+    // Find the current song index in the playlist (if any)
+    final playlist = activePlaylist;
+    int currentIndex = 0;
+    List list = [];
+    if (playlist['list'] is List && (playlist['list'] as List).isNotEmpty) {
+      list = playlist['list'] as List;
+      // Always find the current song index by ytid, not just playlist['index']
+      currentIndex =
+          list.indexWhere((song) => song['ytid'] == metadata.extras?['ytid']);
+      if (currentIndex < 0) currentIndex = 0;
+      final ytids = list.map((song) => song['ytid']).toList();
+      print(
+          '[NowPlaying] currentIndex: $currentIndex ytid: ${metadata.extras?['ytid']} list.length: ${list.length}');
+      print('[NowPlaying] Playlist ytids: $ytids');
+    } else {
+      print('[NowPlaying] Not in playlist context. Playlist is empty.');
+    }
+
+    void playPlaylistSongAt(int index) {
+      print(
+          '[NowPlaying] playPlaylistSongAt called with index: $index, playlist length: '
+          '${playlist['list'] is List ? (playlist['list'] as List).length : 'N/A'}');
+      if (playlist['list'] is List &&
+          index >= 0 &&
+          index < (playlist['list'] as List).length) {
+        print('[NowPlaying] Setting activePlaylist["index"] = $index, ytid: '
+            '${(playlist['list'] as List)[index]['ytid']}');
+        activePlaylist['index'] = index;
+        audioHandler.playPlaylistSong(playlist: playlist, songIndex: index);
+      } else {
+        print(
+            '[NowPlaying] playPlaylistSongAt: index out of range or playlist invalid');
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 22),
       child: Row(
@@ -518,7 +555,34 @@ class PlayerControlButtons extends StatelessWidget {
           _buildShuffleButton(_primaryColor, _secondaryColor, miniIconSize),
           Row(
             children: [
-              _buildPreviousButton(_primaryColor, _secondaryColor, iconSize),
+              IconButton(
+                icon: Icon(
+                  FluentIcons.previous_24_filled,
+                  color: audioHandler.hasPrevious
+                      ? _primaryColor
+                      : _secondaryColor,
+                ),
+                iconSize: iconSize / 1.7,
+                onPressed: () {
+                  print(
+                      '[NowPlaying] Previous button pressed. currentIndex: $currentIndex');
+                  if (repeatNotifier.value == AudioServiceRepeatMode.one) {
+                    print('[NowPlaying] Repeat one mode, calling playAgain');
+                    audioHandler.playAgain();
+                  } else if (playlist['list'] is List &&
+                      (playlist['list'] as List).isNotEmpty) {
+                    final prevIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+                    print('[NowPlaying] Playlist prevIndex: $prevIndex');
+                    activePlaylist['index'] = prevIndex;
+                    playPlaylistSongAt(prevIndex);
+                  } else {
+                    print(
+                        '[NowPlaying] Not in playlist, calling skipToPrevious');
+                    audioHandler.skipToPrevious();
+                  }
+                },
+                splashColor: Colors.transparent,
+              ),
               const SizedBox(width: 10),
               PlaybackIconButton(
                 iconColor: _primaryColor,
@@ -526,7 +590,34 @@ class PlayerControlButtons extends StatelessWidget {
                 iconSize: iconSize,
               ),
               const SizedBox(width: 10),
-              _buildNextButton(_primaryColor, _secondaryColor, iconSize),
+              IconButton(
+                icon: Icon(
+                  FluentIcons.next_24_filled,
+                  color: audioHandler.hasNext ? _primaryColor : _secondaryColor,
+                ),
+                iconSize: iconSize / 1.7,
+                onPressed: () {
+                  print(
+                      '[NowPlaying] Next button pressed. currentIndex: $currentIndex');
+                  if (repeatNotifier.value == AudioServiceRepeatMode.one) {
+                    print('[NowPlaying] Repeat one mode, calling playAgain');
+                    audioHandler.playAgain();
+                  } else if (playlist['list'] is List &&
+                      (playlist['list'] as List).isNotEmpty) {
+                    final nextIndex =
+                        currentIndex < (playlist['list'] as List).length - 1
+                            ? currentIndex + 1
+                            : currentIndex;
+                    print('[NowPlaying] Playlist nextIndex: $nextIndex');
+                    activePlaylist['index'] = nextIndex;
+                    playPlaylistSongAt(nextIndex);
+                  } else {
+                    print('[NowPlaying] Not in playlist, calling skipToNext');
+                    audioHandler.skipToNext();
+                  }
+                },
+                splashColor: Colors.transparent,
+              ),
             ],
           ),
           _buildRepeatButton(_primaryColor, _secondaryColor, miniIconSize),
@@ -564,52 +655,6 @@ class PlayerControlButtons extends StatelessWidget {
                   audioHandler.setShuffleMode(AudioServiceShuffleMode.all);
                 },
               );
-      },
-    );
-  }
-
-  Widget _buildPreviousButton(
-    Color primaryColor,
-    Color secondaryColor,
-    double iconSize,
-  ) {
-    return ValueListenableBuilder<AudioServiceRepeatMode>(
-      valueListenable: repeatNotifier,
-      builder: (_, repeatMode, __) {
-        return IconButton(
-          icon: Icon(
-            FluentIcons.previous_24_filled,
-            color: audioHandler.hasPrevious ? primaryColor : secondaryColor,
-          ),
-          iconSize: iconSize / 1.7,
-          onPressed: () => repeatNotifier.value == AudioServiceRepeatMode.one
-              ? audioHandler.playAgain()
-              : audioHandler.skipToPrevious(),
-          splashColor: Colors.transparent,
-        );
-      },
-    );
-  }
-
-  Widget _buildNextButton(
-    Color primaryColor,
-    Color secondaryColor,
-    double iconSize,
-  ) {
-    return ValueListenableBuilder<AudioServiceRepeatMode>(
-      valueListenable: repeatNotifier,
-      builder: (_, repeatMode, __) {
-        return IconButton(
-          icon: Icon(
-            FluentIcons.next_24_filled,
-            color: audioHandler.hasNext ? primaryColor : secondaryColor,
-          ),
-          iconSize: iconSize / 1.7,
-          onPressed: () => repeatNotifier.value == AudioServiceRepeatMode.one
-              ? audioHandler.playAgain()
-              : audioHandler.skipToNext(),
-          splashColor: Colors.transparent,
-        );
       },
     );
   }

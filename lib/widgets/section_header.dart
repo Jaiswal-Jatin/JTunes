@@ -23,16 +23,22 @@ import 'package:flutter/material.dart';
 import 'package:j3tunes/widgets/section_title.dart';
 
 class SectionHeader extends StatelessWidget {
-  const SectionHeader({super.key, required this.title, this.actionButton});
+  const SectionHeader(
+      {super.key, required this.title, this.actionButton, this.fontSize});
   final String title;
   final Widget? actionButton;
+  final double? fontSize;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        SectionTitle(title, Theme.of(context).colorScheme.primary),
+        SectionTitle(
+          title,
+          Theme.of(context).colorScheme.primary,
+          fontSize: fontSize,
+        ),
         if (actionButton != null) actionButton!,
       ],
     );

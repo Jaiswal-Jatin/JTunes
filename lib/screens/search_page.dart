@@ -1,4 +1,4 @@
-// ignore_for_file: unused_field
+// ignore_for_file: unused_field, unnecessary_parenthesis, require_trailing_commas, prefer_const_constructors, prefer_int_literals, directives_ordering, prefer_final_fields, omit_local_variable_types, prefer_final_locals, avoid_redundant_argument_values
 
 /*
  *     Copyright (C) 2025 Valeri Gokadze
@@ -23,9 +23,10 @@
 
 import 'dart:async';
 
-import 'package:j3tunes/API/musify.dart';
+import 'package:j3tunes/services/youtube_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:j3tunes/extensions/l10n.dart';
 import 'package:j3tunes/main.dart';
@@ -50,7 +51,28 @@ class SearchPage extends StatefulWidget {
 List searchHistory = Hive.box('user').get('searchHistory', defaultValue: []);
 
 class _SearchPageState extends State<SearchPage> {
-  TextEditingController searchController = TextEditingController();
+  // Helper to convert Video object to Map for UI widgets
+  Map<String, dynamic> videoToMap(dynamic video) {
+    // Defensive: support both Video and Map
+    if (video is Map<String, dynamic>) return video;
+    String? imageUrl;
+    try {
+      imageUrl = video.thumbnails?.highResUrl;
+    } catch (_) {
+      imageUrl = null;
+    }
+    return {
+      'title': video.title ?? '',
+      'ytid': video.id?.value ?? '',
+      'image': imageUrl ?? 'assets/images/JTunes.png',
+      'lowResImage': imageUrl ?? 'assets/images/JTunes.png',
+      'artist': video.author ?? '',
+      'duration': video.duration?.inSeconds ?? 0,
+      'description': video.description ?? '',
+    };
+  }
+
+  final TextEditingController searchController = TextEditingController();
   List<String> searchHistory = [];
   bool showResults = false;
   final FocusNode _inputNode = FocusNode();
@@ -60,14 +82,29 @@ class _SearchPageState extends State<SearchPage> {
   List _songsSearchResult = [];
   List _albumsSearchResult = [];
   List _playlistsSearchResult = [];
-  // ignore: prefer_final_fields
   List _suggestionsList = [];
+  List<String> _trendingSearches = [
+    'Arijit Singh',
+    'Taylor Swift',
+    'Top 100 Global Songs',
+    'Top Bollywood Songs',
+    'Bollywood Hits',
+    'Top 50 Indian Songs',
+    'Punjabi Hits',
+    'Lo-fi',
+    'Workout',
+    'Romantic',
+    'Party',
+    'K-pop',
+    'EDM',
+  ];
 
   @override
   void dispose() {
     _debounceTimer?.cancel();
-    searchController.dispose();
+    searchController.clear();
     _inputNode.dispose();
+    _fetchingSongs.dispose();
     super.dispose();
   }
 
@@ -76,16 +113,23 @@ class _SearchPageState extends State<SearchPage> {
     super.initState();
     loadSearchHistory();
 
-    // Listen to text changes to clear results when empty
+    // Listen to text changes for live suggestions and clear results
     searchController.addListener(() {
-      if (searchController.text.isEmpty) {
+      final text = searchController.text;
+      if (text.isEmpty) {
         clearSearchResults();
+        setState(() {
+          _suggestionsList.clear();
+        });
+      } else {
+        fetchSuggestions(text);
       }
     });
   }
 
+  // Search history load karne ka function (ab sahi async/await ke sath)
   void loadSearchHistory() async {
-    final history = getData('user', 'searchHistory') ?? [];
+    final history = await getData('user', 'searchHistory');
     setState(() {
       searchHistory = List<String>.from((history as Iterable<dynamic>));
     });
@@ -116,6 +160,7 @@ class _SearchPageState extends State<SearchPage> {
       _songsSearchResult.clear();
       _albumsSearchResult.clear();
       _playlistsSearchResult.clear();
+      _suggestionsList.clear();
       showResults = false;
     });
   }
@@ -138,53 +183,130 @@ class _SearchPageState extends State<SearchPage> {
         return;
       }
 
+      if (!mounted) return;
+      _fetchingSongs.value = true;
       setState(() {
-        _fetchingSongs.value = true;
+        _suggestionsList.clear();
       });
 
       try {
+        if (!mounted) return;
         setState(() {
           _songsSearchResult.clear();
           _albumsSearchResult.clear();
           _playlistsSearchResult.clear();
         });
 
-        final songResults = await fetchSongsList(query)
-            .timeout(const Duration(seconds: 5))
-            .catchError((e) {
-          logger.log('Search error for songs: $e', null, null);
-          return <Map>[];
-        });
+        final youtubeService = YoutubeService();
+        final songResults =
+            await youtubeService.searchVideos(query, maxResults: 20);
 
+        // Spotify-style: Only show songs between 2 min (120 sec) and 7 min (420 sec) and filter out non-songs
+        final List<String> nonSongKeywords = [
+          'top',
+          'most',
+          'list',
+          'cities',
+          'cream',
+          'sector',
+          'invest',
+          'billion',
+          'viewed',
+          'moisturizer',
+          'part',
+          'year',
+          'quarter',
+          'future',
+          'news',
+          'update',
+          'trending',
+          'chart',
+          'countdown',
+          'mix',
+          'dj',
+          'remix',
+          'mashup',
+          'nonstop',
+          'hour',
+          'minutes',
+          'sec',
+          'live',
+          'session',
+          'radio',
+          'podcast',
+          '2025',
+          '2024',
+          '2023',
+          '2022',
+          '2021',
+          '2020'
+        ];
+        final filteredSongs = songResults
+            .where((song) {
+              final duration = song.duration?.inSeconds ?? 0;
+              String title = song.title.toLowerCase();
+              String desc = song.description.toLowerCase();
+              for (final word in nonSongKeywords) {
+                if (title.contains(word) || desc.contains(word)) {
+                  return false;
+                }
+              }
+              // Only allow songs between 2 min (120 sec) and 7 min (420 sec)
+              return duration >= 120 && duration <= 420;
+            })
+            .map((song) => videoToMap(song))
+            .toList();
+
+        if (!mounted) return;
         setState(() {
-          _songsSearchResult = songResults.take(20).toList();
+          _songsSearchResult = filteredSongs.take(20).toList();
         });
 
         _loadAlbumsAndPlaylists(query);
       } catch (e) {
         logger.log('Search error: $e', null, null);
       } finally {
-        setState(() {
-          _fetchingSongs.value = false;
-        });
+        if (!mounted) return;
+        _fetchingSongs.value = false;
       }
+    });
+
+    // Hide suggestions after search
+    if (!mounted) return;
+    setState(() {
+      _suggestionsList.clear();
+    });
+  }
+
+  // Spotify-style: fetch live suggestions (dummy for now)
+  Future<void> fetchSuggestions(String query) async {
+    final lower = query.toLowerCase();
+    final dummySuggestions = [
+      '$query songs',
+      '$query playlist',
+      '$query album',
+      'Best of $query',
+      'Top $query hits',
+      'Remix $query',
+      'Live $query',
+    ].where((s) => s.toLowerCase().contains(lower)).toList();
+    setState(() {
+      _suggestionsList = dummySuggestions;
     });
   }
 
   // Ye function add karo
   void _loadAlbumsAndPlaylists(String query) async {
     try {
-      final albumResults = await getPlaylists(query: query, type: 'album')
-          .timeout(const Duration(seconds: 3))
-          .catchError((e) => <Map>[]);
-
-      final playlistResults = await getPlaylists(query: query, type: 'playlist')
-          .timeout(const Duration(seconds: 3))
-          .catchError((e) => <Map>[]);
-
+      final youtubeService = YoutubeService();
+      // Use the user's query to get relevant playlists
+      final playlistResults =
+          await youtubeService.searchVideos(query, maxResults: 10);
+      if (!mounted) return;
       setState(() {
-        _albumsSearchResult = albumResults.take(10).toList();
-        _playlistsSearchResult = playlistResults.take(10).toList();
+        _albumsSearchResult = [];
+        _playlistsSearchResult =
+            playlistResults.map((v) => videoToMap(v)).toList();
       });
     } catch (e) {
       logger.log('Error loading albums/playlists: $e', null, null);
@@ -210,6 +332,73 @@ class _SearchPageState extends State<SearchPage> {
                 _inputNode.unfocus();
               },
             ),
+
+            // Spotify-style: Trending Searches Section
+            if (!showResults && searchController.text.isEmpty)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16.0),
+                    child: Text(
+                      'Trending Searches',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: primaryColor,
+                      ),
+                    ),
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    children: _trendingSearches.map((trend) {
+                      return ActionChip(
+                        label: Text(trend),
+                        onPressed: () {
+                          searchController.text = trend;
+                          onSearchSubmitted(trend);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+
+            // Spotify-style: Live Suggestions Section
+            if (_suggestionsList.isNotEmpty && searchController.text.isNotEmpty)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Text(
+                      'Suggestions',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: primaryColor,
+                      ),
+                    ),
+                  ),
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _suggestionsList.length,
+                    itemBuilder: (context, index) {
+                      final suggestion = _suggestionsList[index];
+                      return ListTile(
+                        title: Text(suggestion),
+                        leading: Icon(FluentIcons.search_24_regular),
+                        onTap: () {
+                          searchController.text = suggestion;
+                          onSearchSubmitted(suggestion);
+                          _inputNode.unfocus();
+                        },
+                      );
+                    },
+                  ),
+                ],
+              ),
 
             // Search History Section (when no results)
             if (!showResults ||
@@ -281,90 +470,97 @@ class _SearchPageState extends State<SearchPage> {
                     },
                   ),
                 ],
-              )
+              ),
 
             // Search Results Section
-            else if (showResults)
+            if (showResults)
               Column(
                 children: [
                   // Songs Section
                   if (_songsSearchResult.isNotEmpty) ...[
                     SectionTitle(context.l10n!.songs, primaryColor),
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _songsSearchResult.length > maxSongsInList
-                          ? maxSongsInList
-                          : _songsSearchResult.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        final borderRadius = getItemBorderRadius(
-                          index,
-                          _songsSearchResult.length > maxSongsInList
-                              ? maxSongsInList
-                              : _songsSearchResult.length,
-                        );
-
-                        return SongBar(
-                          _songsSearchResult[index],
-                          true,
-                          showMusicDuration: true,
-                          borderRadius: borderRadius,
-                        );
-                      },
+                    Column(
+                      children: List.generate(
+                        _songsSearchResult.length > maxSongsInList
+                            ? maxSongsInList
+                            : _songsSearchResult.length,
+                        (index) {
+                          final borderRadius = getItemBorderRadius(
+                            index,
+                            _songsSearchResult.length > maxSongsInList
+                                ? maxSongsInList
+                                : _songsSearchResult.length,
+                          );
+                          // Ensure SongBar gets the image as 'lowResImage' for artwork
+                          final song = _songsSearchResult[index];
+                          final songWithImage = song is Map<String, dynamic>
+                              ? Map<String, dynamic>.from(song)
+                              : song;
+                          if (songWithImage is Map<String, dynamic> &&
+                              songWithImage['image'] != null) {
+                            songWithImage['lowResImage'] =
+                                songWithImage['image'];
+                          }
+                          return SongBar(
+                            songWithImage,
+                            true,
+                            showMusicDuration: false, // Hide duration on image
+                            borderRadius: borderRadius,
+                          );
+                        },
+                      ),
                     ),
                   ],
 
                   // Albums Section
                   if (_albumsSearchResult.isNotEmpty) ...[
                     SectionTitle(context.l10n!.albums, primaryColor),
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _albumsSearchResult.length > maxSongsInList
-                          ? maxSongsInList
-                          : _albumsSearchResult.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        final playlist = _albumsSearchResult[index];
-                        final borderRadius = getItemBorderRadius(
-                          index,
-                          _albumsSearchResult.length > maxSongsInList
-                              ? maxSongsInList
-                              : _albumsSearchResult.length,
-                        );
-
-                        return PlaylistBar(
-                          key: ValueKey(playlist['ytid']),
-                          playlist['title'],
-                          playlistId: playlist['ytid'],
-                          playlistArtwork: playlist['image'],
-                          cubeIcon: FluentIcons.cd_16_filled,
-                          isAlbum: true,
-                          borderRadius: borderRadius,
-                        );
-                      },
+                    Column(
+                      children: List.generate(
+                        _albumsSearchResult.length > maxSongsInList
+                            ? maxSongsInList
+                            : _albumsSearchResult.length,
+                        (index) {
+                          final playlist = _albumsSearchResult[index];
+                          final borderRadius = getItemBorderRadius(
+                            index,
+                            _albumsSearchResult.length > maxSongsInList
+                                ? maxSongsInList
+                                : _albumsSearchResult.length,
+                          );
+                          return PlaylistBar(
+                            key: ValueKey(playlist['ytid']),
+                            playlist['title'],
+                            playlistId: playlist['ytid'],
+                            playlistArtwork: playlist['image'],
+                            cubeIcon: FluentIcons.cd_16_filled,
+                            isAlbum: true,
+                            borderRadius: borderRadius,
+                          );
+                        },
+                      ),
                     ),
                   ],
 
                   // Playlists Section
                   if (_playlistsSearchResult.isNotEmpty) ...[
                     SectionTitle(context.l10n!.playlists, primaryColor),
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: commonListViewBottmomPadding,
-                      itemCount: _playlistsSearchResult.length > maxSongsInList
-                          ? maxSongsInList
-                          : _playlistsSearchResult.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        final playlist = _playlistsSearchResult[index];
-                        return PlaylistBar(
-                          key: ValueKey(playlist['ytid']),
-                          playlist['title'],
-                          playlistId: playlist['ytid'],
-                          playlistArtwork: playlist['image'],
-                          cubeIcon: FluentIcons.apps_list_24_filled,
-                        );
-                      },
+                    Column(
+                      children: List.generate(
+                        _playlistsSearchResult.length > maxSongsInList
+                            ? maxSongsInList
+                            : _playlistsSearchResult.length,
+                        (index) {
+                          final playlist = _playlistsSearchResult[index];
+                          return PlaylistBar(
+                            key: ValueKey(playlist['ytid']),
+                            playlist['title'],
+                            playlistId: playlist['ytid'],
+                            playlistArtwork: playlist['image'],
+                            cubeIcon: FluentIcons.apps_list_24_filled,
+                          );
+                        },
+                      ),
                     ),
                   ],
                 ],

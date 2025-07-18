@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_null_checks
+
 /*
  *     Copyright (C) 2025 Valeri Gokadze
  *

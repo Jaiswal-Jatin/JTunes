@@ -1,3 +1,5 @@
+// ignore_for_file: unused_local_variable, omit_local_variable_types, cascade_invocations, require_trailing_commas, directives_ordering
+
 /*
  *     Copyright (C) 2025 Valeri Gokadze
  *
@@ -22,8 +24,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 import 'package:j3tunes/DB/albums.db.dart';
@@ -33,6 +35,8 @@ import 'package:j3tunes/main.dart';
 import 'package:j3tunes/services/data_manager.dart';
 import 'package:j3tunes/services/io_service.dart';
 import 'package:j3tunes/services/lyrics_manager.dart';
+import 'package:j3tunes/services/settings_manager.dart' as settings_manager
+    hide defaultRecommendations;
 import 'package:j3tunes/services/settings_manager.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:j3tunes/utilities/formatter.dart';
@@ -127,24 +131,20 @@ Future<List> getRecommendedSongs() async {
 Future<List> _getRecommendationsFromRecentlyPlayed() async {
   final recent = userRecentlyPlayed.take(3).toList();
 
-  final futures =
-      recent.map((songData) async {
-        try {
-          final song = await _yt.videos.get(songData['ytid']);
-          final relatedSongs = await _yt.videos.getRelatedVideos(song) ?? [];
-          return relatedSongs
-              .take(3)
-              .map((s) => returnSongLayout(0, s))
-              .toList();
-        } catch (e, stackTrace) {
-          logger.log(
-            'Error getting related videos for ${songData['ytid']}',
-            e,
-            stackTrace,
-          );
-          return <Map>[];
-        }
-      }).toList();
+  final futures = recent.map((songData) async {
+    try {
+      final song = await _yt.videos.get(songData['ytid']);
+      final relatedSongs = await _yt.videos.getRelatedVideos(song) ?? [];
+      return relatedSongs.take(3).map((s) => returnSongLayout(0, s)).toList();
+    } catch (e, stackTrace) {
+      logger.log(
+        'Error getting related videos for ${songData['ytid']}',
+        e,
+        stackTrace,
+      );
+      return <Map>[];
+    }
+  }).toList();
 
   final results = await Future.wait(futures);
   final playlistSongs = results.expand((list) => list).toList()..shuffle();
@@ -438,16 +438,14 @@ Future<List> getPlaylists({
   // and augment with online search results.
   if (query != null && playlistsNum == null) {
     final lowercaseQuery = query.toLowerCase();
-    final filteredPlaylists =
-        playlists.where((playlist) {
-          final title = playlist['title'].toLowerCase();
-          final matchesQuery = title.contains(lowercaseQuery);
-          final matchesType =
-              type == 'all' ||
-              (type == 'album' && playlist['isAlbum'] == true) ||
-              (type == 'playlist' && playlist['isAlbum'] != true);
-          return matchesQuery && matchesType;
-        }).toList();
+    final filteredPlaylists = playlists.where((playlist) {
+      final title = playlist['title'].toLowerCase();
+      final matchesQuery = title.contains(lowercaseQuery);
+      final matchesType = type == 'all' ||
+          (type == 'album' && playlist['isAlbum'] == true) ||
+          (type == 'playlist' && playlist['isAlbum'] != true);
+      return matchesQuery && matchesType;
+    }).toList();
 
     final searchTerm = type == 'album' ? '$query album' : query;
     final searchResults = await _yt.search.searchContent(
@@ -459,24 +457,23 @@ Future<List> getPlaylists({
     final existingYtIds =
         onlinePlaylists.map((p) => p['ytid'] as String).toSet();
 
-    final newPlaylists =
-        searchResults
-            .whereType<SearchPlaylist>()
-            .map((playlist) {
-              final playlistMap = {
-                'ytid': playlist.id.toString(),
-                'title': playlist.title,
-                'source': 'youtube',
-                'list': [],
-              };
-              if (!existingYtIds.contains(playlistMap['ytid'])) {
-                existingYtIds.add(playlistMap['ytid'].toString());
-                return playlistMap;
-              }
-              return null;
-            })
-            .whereType<Map<String, dynamic>>()
-            .toList();
+    final newPlaylists = searchResults
+        .whereType<SearchPlaylist>()
+        .map((playlist) {
+          final playlistMap = {
+            'ytid': playlist.id.toString(),
+            'title': playlist.title,
+            'source': 'youtube',
+            'list': [],
+          };
+          if (!existingYtIds.contains(playlistMap['ytid'])) {
+            existingYtIds.add(playlistMap['ytid'].toString());
+            return playlistMap;
+          }
+          return null;
+        })
+        .whereType<Map<String, dynamic>>()
+        .toList();
     onlinePlaylists.addAll(newPlaylists);
 
     // Merge online playlists that match the query.
@@ -570,13 +567,12 @@ Future<List<Map<String, int>>> getSkipSegments(String id) async {
     );
     if (res.body != 'Not Found') {
       final data = jsonDecode(res.body);
-      final segments =
-          data.map((obj) {
-            return Map.castFrom<String, dynamic, String, int>({
-              'start': obj['segment'].first.toInt(),
-              'end': obj['segment'].last.toInt(),
-            });
-          }).toList();
+      final segments = data.map((obj) {
+        return Map.castFrom<String, dynamic, String, int>({
+          'start': obj['segment'].first.toInt(),
+          'end': obj['segment'].last.toInt(),
+        });
+      }).toList();
       return List.castFrom<dynamic, Map<String, int>>(segments);
     } else {
       return [];
@@ -766,7 +762,8 @@ Future<String?> getSong(String songId, bool isLive) async {
     }
 
     const _cacheDuration = Duration(hours: 3);
-    final cacheKey = 'song_${songId}_${audioQualitySetting.value}_url';
+    final cacheKey =
+        'song_${songId}_${settings_manager.audioQualitySetting.value}_url';
 
     // Try to get from cache
     final cachedUrl = await getData(
@@ -815,7 +812,7 @@ Future<String?> getSong(String songId, bool isLive) async {
 }
 
 AudioStreamInfo selectAudioQuality(List<AudioStreamInfo> availableSources) {
-  final qualitySetting = audioQualitySetting.value;
+  final qualitySetting = settings_manager.audioQualitySetting.value;
 
   if (qualitySetting == 'low') {
     return availableSources.last;

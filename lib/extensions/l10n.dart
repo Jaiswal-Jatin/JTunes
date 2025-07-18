@@ -1,3 +1,5 @@
+// ignore_for_file: directives_ordering
+
 /*
  *     Copyright (C) 2025 Valeri Gokadze
  *

@@ -1,4 +1,4 @@
-// ignore_for_file: unused_element, unused_import
+// ignore_for_file: unused_element, unused_import, directives_ordering
 
 /*
  *     Copyright (C) 2025 Valeri Gokadze
@@ -347,7 +347,7 @@ class SettingsPage extends StatelessWidget {
 
           return GestureDetector(
             onTap: () {
-              //TODO: migrate this
+      
               addOrUpdateData(
                 'settings',
                 'accentColor',

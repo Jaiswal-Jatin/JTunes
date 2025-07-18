@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_const_constructors
+
 /*
  *     Copyright (C) 2025 Valeri Gokadze
  *

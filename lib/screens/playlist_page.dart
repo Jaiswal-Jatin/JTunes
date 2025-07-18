@@ -1,3 +1,5 @@
+// ignore_for_file: directives_ordering
+
 /*
  *     Copyright (C) 2025 Valeri Gokadze
  *
@@ -21,7 +23,7 @@
 
 import 'dart:math';
 
-import 'package:j3tunes/API/musify.dart';
+import 'package:j3tunes/services/jiosaavn_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -66,32 +68,116 @@ class _PlaylistPageState extends State<PlaylistPage> {
   final int _itemsPerPage = 20; // 35 se 20 kar do (less load)
   var _currentPage = 0;
   var _currentLastLoadedId = 0;
-  late final playlistLikeStatus = ValueNotifier<bool>(
-    isPlaylistAlreadyLiked(widget.playlistId),
-  );
+
+  // For like, recent, download, custom playlist
+  ValueNotifier<bool> playlistLikeStatus = ValueNotifier(false);
+
+  // Check if playlist is liked
+  Future<void> checkPlaylistLikeStatus() async {
+    final id = _playlist?['ytid'] ?? widget.playlistId;
+    if (id != null) {
+      final liked = await isPlaylistLiked(id);
+      playlistLikeStatus.value = liked;
+    }
+  }
+
+  // Update like status
+  Future<void> updatePlaylistLikeStatus(String? playlistId, bool like) async {
+    if (playlistId == null) return;
+    if (like) {
+      await likePlaylist(playlistId);
+    } else {
+      await unlikePlaylist(playlistId);
+    }
+  }
+
+  // Custom playlists ValueNotifier
+  ValueNotifier<List<Map>> userCustomPlaylists = ValueNotifier([]);
+
+  Future<void> loadUserCustomPlaylists() async {
+    final playlists = await getAllCustomPlaylists();
+    userCustomPlaylists.value = playlists;
+  }
+
+  Future<void> addSongInCustomPlaylist(
+    BuildContext context,
+    String playlistId,
+    dynamic song, {
+    int? indexToInsert,
+  }) async {
+    await addSongToCustomPlaylist(playlistId, song);
+    await loadUserCustomPlaylists();
+    setState(() {});
+  }
+
+  Future<void> removeSongFromPlaylist(String playlistId, dynamic song) async {
+    await removeSongFromCustomPlaylist(playlistId, song);
+    await loadUserCustomPlaylists();
+    setState(() {});
+  }
+
+  // Removed unused setActivePlaylist and duplicate playlistLikeStatus
   bool playlistOfflineStatus = false;
 
   @override
   void initState() {
     super.initState();
     _initializePlaylist();
+    loadUserCustomPlaylists();
   }
 
   Future<void> _initializePlaylist() async {
-    if (!mounted) return; // Check mounted state
-    
+    if (!mounted) return;
     try {
-      _playlist = widget.playlistData == null
-          ? await getPlaylistInfoForWidget(
-              widget.playlistId,
-              isArtist: widget.isArtist,
-            ).timeout(const Duration(seconds: 10)) // Add timeout
-          : widget.playlistData;
-      
+      if (widget.playlistData != null) {
+        // JioSaavn playlist data passed from home
+        _playlist = widget.playlistData;
+      } else if (widget.playlistId != null && widget.playlistId!.isNotEmpty) {
+        // Fetch playlist from JioSaavn by ID (if supported by your service)
+        final jioSaavn = JioSaavnService();
+        final playlists = await jioSaavn.fetchPlaylists();
+        final found = playlists.firstWhere(
+          (p) => p.id == widget.playlistId,
+          orElse: () => null,
+        );
+        if (found != null) {
+          _playlist = found;
+        } else {
+          _playlist = {
+            'list': [],
+            'title': 'No Playlist Found',
+            'source': 'jiosaavn',
+            'id': widget.playlistId ?? '',
+          };
+        }
+      } else {
+        _playlist = {
+          'list': [],
+          'title': 'Empty Playlist',
+          'source': 'jiosaavn',
+          'id': '',
+        };
+      }
+
+      // JioSaavn playlist: songs are usually in 'songs' or 'list' key
+      if (_playlist != null &&
+          (_playlist['songs'] is List || _playlist['list'] is List)) {
+        _playlist['list'] = _playlist['songs'] ?? _playlist['list'] ?? [];
+      } else {
+        _playlist['list'] = [];
+      }
+
+      await checkPlaylistLikeStatus();
+
       if (mounted) {
+        _songsList.clear();
+        _currentPage = 0;
+        _currentLastLoadedId = 0;
+        _hasMore = true;
         _loadMore();
       }
     } catch (e) {
+      logger.log('Error initializing playlist: $e', null, null);
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -123,11 +209,24 @@ class _PlaylistPageState extends State<PlaylistPage> {
   Future<List<dynamic>> fetch() async {
     try {
       final list = <dynamic>[];
-      final _count = _playlist['list'].length as int;
-      final n = min(_itemsPerPage, _count - _currentPage * _itemsPerPage);
+      if (_playlist == null || _playlist['list'] == null) {
+        return list;
+      }
+
+      final playlistSongs = _playlist['list'] as List;
+      final _count = playlistSongs.length;
+
+      if (_currentLastLoadedId >= _count) {
+        return list; // No more songs to load
+      }
+
+      final n = min(_itemsPerPage, _count - _currentLastLoadedId);
+
       for (var i = 0; i < n; i++) {
-        list.add(_playlist['list'][_currentLastLoadedId]);
-        _currentLastLoadedId++;
+        if (_currentLastLoadedId < _count) {
+          list.add(playlistSongs[_currentLastLoadedId]);
+          _currentLastLoadedId++;
+        }
       }
 
       _currentPage++;
@@ -247,15 +346,13 @@ class _PlaylistPageState extends State<PlaylistPage> {
               ? const Icon(FluentIcons.heart_24_filled)
               : const Icon(FluentIcons.heart_24_regular),
           iconSize: 26,
-          onPressed: () {
+          onPressed: () async {
             playlistLikeStatus.value = !playlistLikeStatus.value;
-            updatePlaylistLikeStatus(
+            await updatePlaylistLikeStatus(
               _playlist['ytid'],
               playlistLikeStatus.value,
             );
-            currentLikedPlaylistsLength.value = value
-                ? currentLikedPlaylistsLength.value + 1
-                : currentLikedPlaylistsLength.value - 1;
+            setState(() {});
           },
         );
       },
@@ -457,10 +554,8 @@ class _PlaylistPageState extends State<PlaylistPage> {
               highlightColor: Colors.transparent,
               icon: const Icon(FluentIcons.arrow_download_24_filled),
               iconSize: 26,
-              onPressed: () => offlinePlaylistService.downloadPlaylist(
-                context,
-                _playlist,
-              ),
+              onPressed: () =>
+                  offlinePlaylistService.downloadPlaylist(context, _playlist),
               tooltip: context.l10n!.downloadPlaylist,
             );
           },
@@ -496,23 +591,12 @@ class _PlaylistPageState extends State<PlaylistPage> {
   }
 
   void _handleSyncPlaylist() async {
-    if (_playlist['ytid'] != null) {
-      _playlist = await updatePlaylistList(context, _playlist['ytid']);
-      _hasMore = true;
-      _songsList.clear();
-      setState(() {
-        _currentPage = 0;
-        _currentLastLoadedId = 0;
-        _loadMore();
-      });
-    } else {
-      final updatedPlaylist = await getPlaylistInfoForWidget(widget.playlistId);
-      if (updatedPlaylist != null) {
-        setState(() {
-          _songsList = updatedPlaylist['list'];
-        });
-      }
-    }
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+    });
+    // Sync not needed for JioSaavn playlists (no remote update)
   }
 
   void _updateSongsListOnRemove(int indexOfRemovedSong) {
@@ -547,10 +631,8 @@ class _PlaylistPageState extends State<PlaylistPage> {
       iconSize: 25,
       onPressed: () {
         final _newList = List.of(_playlist['list'])..shuffle();
-        setActivePlaylist({
-          'title': _playlist['title'],
-          'image': _playlist['image'],
-          'list': _newList,
+        setState(() {
+          _playlist['list'] = _newList;
         });
       },
     );
@@ -621,25 +703,28 @@ class _PlaylistPageState extends State<PlaylistPage> {
     }
 
     final borderRadius = getItemBorderRadius(index, _songsList.length);
-
+    // Ensure SongBar gets the image as 'lowResImage' for artwork
+    final song = _songsList[index];
+    final songWithImage =
+        song is Map<String, dynamic> ? Map<String, dynamic>.from(song) : song;
+    if (songWithImage is Map<String, dynamic> &&
+        songWithImage['image'] != null) {
+      songWithImage['lowResImage'] = songWithImage['image'];
+    }
     return SongBar(
-      _songsList[index],
+      songWithImage,
       true,
       onRemove: isRemovable
-          ? () => {
-                if (removeSongFromPlaylist(
-                  _playlist,
-                  _songsList[index],
-                  removeOneAtIndex: index,
-                ))
-                  {_updateSongsListOnRemove(index)},
-              }
+          ? () async {
+              await removeSongFromPlaylist(
+                _playlist['title'],
+                _songsList[index],
+              );
+              _updateSongsListOnRemove(index);
+            }
           : null,
-      onPlay: () => {
-        audioHandler.playPlaylistSong(
-          playlist: activePlaylist != _playlist ? _playlist : null,
-          songIndex: index,
-        ),
+      onPlay: () {
+        audioHandler.playPlaylistSong(playlist: _playlist, songIndex: index);
       },
       isSongOffline: playlistOfflineStatus,
       borderRadius: borderRadius,

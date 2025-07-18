@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use, use_colored_box, require_trailing_commas, sort_constructors_first, directives_ordering
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';

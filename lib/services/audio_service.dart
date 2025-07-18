@@ -1,4 +1,4 @@
-// ignore_for_file: directives_ordering, override_on_non_overriding_member
+// ignore_for_file: directives_ordering, override_on_non_overriding_member, unnecessary_null_comparison, require_trailing_commas, unnecessary_null_in_if_null_operators
 
 /*
  *     Copyright (C) 2025 Valeri Gokadze
@@ -32,10 +32,33 @@ import 'package:j3tunes/main.dart';
 import 'package:j3tunes/models/position_data.dart';
 import 'package:j3tunes/services/data_manager.dart';
 import 'package:j3tunes/services/settings_manager.dart';
+import 'package:j3tunes/services/music_service.dart';
 import 'package:j3tunes/utilities/mediaitem.dart';
 import 'package:rxdart/rxdart.dart';
 
 class J3TunesAudioHandler extends BaseAudioHandler {
+  Future<ClippingAudioSource?> checkIfSponsorBlockIsAvailable(
+    UriAudioSource audioSource,
+    String songId,
+  ) async {
+    try {
+      final segments = await getSkipSegments(songId);
+      if (segments.isNotEmpty && segments[0]['end'] != null) {
+        return ClippingAudioSource(
+          child: audioSource,
+          start: Duration.zero,
+          end: Duration(seconds: segments[0]['end']!),
+        );
+      }
+    } catch (e, stackTrace) {
+      logger.log('Error checking sponsor block', e, stackTrace);
+    }
+    return null;
+  }
+
+  // Track if currently playing a playlist
+  bool _isPlaylistMode = false;
+  String? _currentPlaylistId;
   J3TunesAudioHandler() {
     _setupEventSubscriptions();
     _updatePlaybackState();
@@ -467,8 +490,15 @@ class J3TunesAudioHandler extends BaseAudioHandler {
       }
 
       _currentQueueIndex = index;
-      _updateQueueMediaItems();
 
+      // UI ko turant update karo (song bar me show ho)
+      final mediaItems = _queueList.map(mapToMediaItem).toList();
+      queue.add(mediaItems);
+      if (_currentQueueIndex < mediaItems.length) {
+        mediaItem.add(mediaItems[_currentQueueIndex]);
+      }
+
+      // Ab song ko load/play karo
       final success = await playSong(_queueList[index]);
 
       if (success) {
@@ -643,6 +673,12 @@ class J3TunesAudioHandler extends BaseAudioHandler {
         return false;
       }
 
+      // If playing a single song (not playlist), set mode to non-playlist
+      if (!_queueList.any((s) => s['ytid'] == song['ytid'])) {
+        _isPlaylistMode = false;
+        _currentPlaylistId = null;
+      }
+
       _lastError = null;
       final isOffline = song['isOffline'] ?? false;
 
@@ -684,7 +720,51 @@ class J3TunesAudioHandler extends BaseAudioHandler {
     if (isOffline) {
       return _getOfflineSongUrl(song);
     } else {
-      return getSong(song['ytid'], song['isLive'] ?? false);
+      // Use new MusicServices API for online song
+      try {
+        final musicService = MusicServices();
+        final songId = song['ytid'] ?? song['videoId'];
+        if (songId == null) {
+          logger.log('Song ID is null for song: $song', null, null);
+          return null;
+        }
+        final playlistData =
+            await musicService.getWatchPlaylist(videoId: songId);
+        logger.log(
+            'getWatchPlaylist response for $songId: $playlistData', null, null);
+        if (playlistData != null && playlistData['tracks'].isNotEmpty) {
+          final track = playlistData['tracks'][0];
+          logger.log('Track info for $songId: $track', null, null);
+          // Try to get stream URL from track
+          final url = track['streamUrl'] ?? track['url'] ?? null;
+          logger.log('Fetched stream URL for $songId: $url', null, null);
+          if (url != null && url.isNotEmpty) {
+            return url;
+          }
+        } else {
+          logger.log('No tracks found in playlistData for $songId', null, null);
+        }
+        // Fallback to musify.dart getSong if MusicServices fails
+        logger.log('Trying musify.getSong fallback for $songId', null, null);
+        final fallbackUrl = await getSong(songId, song['isLive'] ?? false);
+        logger.log('musify.getSong fallback URL for $songId: $fallbackUrl',
+            null, null);
+        return fallbackUrl;
+      } catch (e) {
+        logger.log(
+            'Exception in _getSongUrl for song: $song, error: $e', null, null);
+        // Fallback to musify.dart getSong if MusicServices throws error
+        final songId = song['ytid'] ?? song['videoId'];
+        logger.log('Trying musify.getSong fallback after exception for $songId',
+            null, null);
+        if (songId != null) {
+          final fallbackUrl = await getSong(songId, song['isLive'] ?? false);
+          logger.log('musify.getSong fallback URL for $songId: $fallbackUrl',
+              null, null);
+          return fallbackUrl;
+        }
+        return null;
+      }
     }
   }
 
@@ -817,6 +897,8 @@ class J3TunesAudioHandler extends BaseAudioHandler {
   }) async {
     try {
       if (playlist != null && playlist['list'] != null) {
+        _isPlaylistMode = true;
+        _currentPlaylistId = playlist['ytid']?.toString();
         await addPlaylistToQueue(
           List<Map>.from(playlist['list']),
           replace: true,
@@ -858,25 +940,6 @@ class J3TunesAudioHandler extends BaseAudioHandler {
     }
   }
 
-  Future<ClippingAudioSource?> checkIfSponsorBlockIsAvailable(
-    UriAudioSource audioSource,
-    String songId,
-  ) async {
-    try {
-      final segments = await getSkipSegments(songId);
-      if (segments.isNotEmpty && segments[0]['end'] != null) {
-        return ClippingAudioSource(
-          child: audioSource,
-          start: Duration.zero,
-          end: Duration(seconds: segments[0]['end']!),
-        );
-      }
-    } catch (e, stackTrace) {
-      logger.log('Error checking sponsor block', e, stackTrace);
-    }
-    return null;
-  }
-
   Future<void> skipToSong(int newIndex) async {
     try {
       if (newIndex < 0 || newIndex >= _queueList.length) {
@@ -892,13 +955,21 @@ class J3TunesAudioHandler extends BaseAudioHandler {
   @override
   Future<void> skipToNext() async {
     try {
-      if (_currentQueueIndex < _queueList.length - 1) {
-        await _playFromQueue(_currentQueueIndex + 1);
-      } else if (repeatNotifier.value == AudioServiceRepeatMode.all &&
-          _queueList.isNotEmpty) {
-        await _playFromQueue(0);
-      } else if (playNextSongAutomatically.value && !_isLoadingNextSong) {
-        await _handleAutoPlayNext();
+      if (_isPlaylistMode) {
+        // Playlist mode: only allow next within playlist queue
+        if (_currentQueueIndex < _queueList.length - 1) {
+          await _playFromQueue(_currentQueueIndex + 1);
+        } else if (repeatNotifier.value == AudioServiceRepeatMode.all &&
+            _queueList.isNotEmpty) {
+          await _playFromQueue(0);
+        }
+      } else {
+        // Not playlist mode: play related/next recommended
+        if (_currentQueueIndex < _queueList.length - 1) {
+          await _playFromQueue(_currentQueueIndex + 1);
+        } else if (playNextSongAutomatically.value && !_isLoadingNextSong) {
+          await _handleAutoPlayNext();
+        }
       }
     } catch (e, stackTrace) {
       logger.log('Error skipping to next song', e, stackTrace);
@@ -930,15 +1001,23 @@ class J3TunesAudioHandler extends BaseAudioHandler {
   @override
   Future<void> skipToPrevious() async {
     try {
-      if (_currentQueueIndex > 0) {
-        await _playFromQueue(_currentQueueIndex - 1);
-      } else if (_historyList.isNotEmpty) {
-        final previousSong = _historyList.removeAt(0);
-        _queueList.insert(0, previousSong);
-        await _playFromQueue(0);
-      } else if (repeatNotifier.value == AudioServiceRepeatMode.all &&
-          _queueList.isNotEmpty) {
-        await _playFromQueue(_queueList.length - 1);
+      if (_isPlaylistMode) {
+        // Playlist mode: only allow previous within playlist queue
+        if (_currentQueueIndex > 0) {
+          await _playFromQueue(_currentQueueIndex - 1);
+        } else if (repeatNotifier.value == AudioServiceRepeatMode.all &&
+            _queueList.isNotEmpty) {
+          await _playFromQueue(_queueList.length - 1);
+        }
+      } else {
+        // Not playlist mode: allow previous from history or queue
+        if (_currentQueueIndex > 0) {
+          await _playFromQueue(_currentQueueIndex - 1);
+        } else if (_historyList.isNotEmpty) {
+          final previousSong = _historyList.removeAt(0);
+          _queueList.insert(0, previousSong);
+          await _playFromQueue(0);
+        }
       }
     } catch (e, stackTrace) {
       logger.log('Error skipping to previous song', e, stackTrace);

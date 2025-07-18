@@ -1,3 +1,5 @@
+// ignore_for_file: use_colored_box, deprecated_member_use, require_trailing_commas, omit_local_variable_types
+
 import 'dart:io';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';

@@ -1,7 +1,6 @@
 name: j3tunes
 description: Music Streaming app made in Flutter!
 
-
 publish_to: 'none'
 version: 1.0.1+2 
 
@@ -32,11 +31,17 @@ dependencies:
   rxdart: 
   url_launcher: 
   youtube_explode_dart:
+    git:
+      url: https://github.com/anandnet/youtube_explode_dart.git
   shared_preferences: 
   image_picker: 
   path_provider:
-  # home_widget: 
-  # workmanager: 
+  dio: 
+  get: 
+  jiosaavn:  
+  home_widget: 
+  workmanager: 
+ 
 
 dev_dependencies:
   flutter_test:

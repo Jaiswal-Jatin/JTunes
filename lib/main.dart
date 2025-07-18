@@ -25,6 +25,8 @@ import 'package:j3tunes/services/update_manager.dart';
 import 'package:j3tunes/style/app_themes.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:path_provider/path_provider.dart';
+/// Global notifier for the currently selected song (for instant SongBar update)
+final ValueNotifier<Map<String, dynamic>?> currentSongNotifier = ValueNotifier<Map<String, dynamic>?>(null);
 
 late J3TunesAudioHandler audioHandler;
 

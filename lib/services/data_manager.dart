@@ -1,3 +1,121 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
+import 'package:j3tunes/extensions/l10n.dart';
+import 'package:j3tunes/main.dart';
+
+// --- Local management for likes, recents, downloads, custom playlists ---
+const String likedSongsBox = 'liked_songs';
+const String likedPlaylistsBox = 'liked_playlists';
+const String recentSongsBox = 'recent_songs';
+const String downloadedSongsBox = 'downloaded_songs';
+const String customPlaylistsBox = 'custom_playlists';
+
+Future<void> likeSong(String videoId) async {
+  final box = await _openBox(likedSongsBox);
+  await box.put(videoId, true);
+}
+
+Future<void> unlikeSong(String videoId) async {
+  final box = await _openBox(likedSongsBox);
+  await box.delete(videoId);
+}
+
+Future<bool> isSongLiked(String videoId) async {
+  final box = await _openBox(likedSongsBox);
+  return box.get(videoId, defaultValue: false) == true;
+}
+
+Future<List<String>> getLikedSongs() async {
+  final box = await _openBox(likedSongsBox);
+  return box.keys.cast<String>().toList();
+}
+
+Future<void> likePlaylist(String playlistId) async {
+  final box = await _openBox(likedPlaylistsBox);
+  await box.put(playlistId, true);
+}
+
+Future<void> unlikePlaylist(String playlistId) async {
+  final box = await _openBox(likedPlaylistsBox);
+  await box.delete(playlistId);
+}
+
+Future<bool> isPlaylistLiked(String playlistId) async {
+  final box = await _openBox(likedPlaylistsBox);
+  return box.get(playlistId, defaultValue: false) == true;
+}
+
+Future<List<String>> getLikedPlaylists() async {
+  final box = await _openBox(likedPlaylistsBox);
+  return box.keys.cast<String>().toList();
+}
+
+Future<void> addRecentSong(String videoId) async {
+  final box = await _openBox(recentSongsBox);
+  await box.put(videoId, DateTime.now().toIso8601String());
+}
+
+Future<List<String>> getRecentSongs({int max = 50}) async {
+  final box = await _openBox(recentSongsBox);
+  final entries = box.toMap().entries.toList();
+  entries.sort((a, b) => (b.value as String).compareTo(a.value as String));
+  return entries.map((e) => e.key as String).take(max).toList();
+}
+
+Future<void> addDownloadedSong(String videoId) async {
+  final box = await _openBox(downloadedSongsBox);
+  await box.put(videoId, true);
+}
+
+Future<List<String>> getDownloadedSongs() async {
+  final box = await _openBox(downloadedSongsBox);
+  return box.keys.cast<String>().toList();
+}
+
+// Custom Playlists
+Future<void> createCustomPlaylist(String playlistId, Map playlistData) async {
+  final box = await _openBox(customPlaylistsBox);
+  await box.put(playlistId, playlistData);
+}
+
+Future<void> deleteCustomPlaylist(String playlistId) async {
+  final box = await _openBox(customPlaylistsBox);
+  await box.delete(playlistId);
+}
+
+Future<Map?> getCustomPlaylist(String playlistId) async {
+  final box = await _openBox(customPlaylistsBox);
+  return box.get(playlistId);
+}
+
+Future<List<Map>> getAllCustomPlaylists() async {
+  final box = await _openBox(customPlaylistsBox);
+  return box.values.cast<Map>().toList();
+}
+
+Future<void> addSongToCustomPlaylist(String playlistId, dynamic song) async {
+  final box = await _openBox(customPlaylistsBox);
+  final playlist = box.get(playlistId) ?? {'list': []};
+  final list = List.from(playlist['list'] ?? []);
+  list.add(song);
+  playlist['list'] = list;
+  await box.put(playlistId, playlist);
+}
+
+Future<void> removeSongFromCustomPlaylist(
+    String playlistId, dynamic song) async {
+  final box = await _openBox(customPlaylistsBox);
+  final playlist = box.get(playlistId);
+  if (playlist != null && playlist['list'] != null) {
+    final list = List.from(playlist['list']);
+    list.removeWhere((item) => item['id'] == song['id']);
+    playlist['list'] = list;
+    await box.put(playlistId, playlist);
+  }
+}
+
 /*
  *     Copyright (C) 2025 Valeri Gokadze
  *
@@ -19,13 +137,12 @@
  *     please visit: https://github.com/gokadzev/J3Tunes
  */
 
-import 'dart:io';
-
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
-import 'package:j3tunes/extensions/l10n.dart';
-import 'package:j3tunes/main.dart';
+// import 'dart:io';
+// import 'package:file_picker/file_picker.dart';
+// import 'package:flutter/material.dart';
+// import 'package:hive/hive.dart';
+// import 'package:j3tunes/extensions/l10n.dart';
+// import 'package:j3tunes/main.dart';
 
 // Cache durations for different types of data
 const Duration songCacheDuration = Duration(hours: 1, minutes: 30);
@@ -265,14 +382,13 @@ Future<String> restoreData(BuildContext context) async {
     await Future.delayed(const Duration(milliseconds: 100));
 
     for (final boxName in boxNames) {
-      final backupFile =
-          result.files
-              .where(
-                (file) =>
-                    file.name == '$boxName.hive' ||
-                    file.name.startsWith('${boxName}_'),
-              )
-              .firstOrNull;
+      final backupFile = result.files
+          .where(
+            (file) =>
+                file.name == '$boxName.hive' ||
+                file.name.startsWith('${boxName}_'),
+          )
+          .firstOrNull;
 
       if (backupFile?.path != null) {
         final sourceFile = File(backupFile!.path!);

@@ -23,9 +23,10 @@ import 'package:flutter/material.dart';
 import 'package:j3tunes/widgets/marque.dart';
 
 class SectionTitle extends StatelessWidget {
-  const SectionTitle(this.title, this.primaryColor, {super.key});
+  const SectionTitle(this.title, this.primaryColor, {super.key, this.fontSize});
   final Color primaryColor;
   final String title;
+  final double? fontSize;
 
   @override
   Widget build(BuildContext context) {
@@ -40,8 +41,9 @@ class SectionTitle extends StatelessWidget {
               title,
               style: TextStyle(
                 color: primaryColor,
-                fontSize:
-                    Theme.of(context).textTheme.titleMedium?.fontSize ?? 16,
+                fontSize: fontSize ??
+                    Theme.of(context).textTheme.titleMedium?.fontSize ??
+                    16,
                 fontWeight: FontWeight.bold,
               ),
             ),
