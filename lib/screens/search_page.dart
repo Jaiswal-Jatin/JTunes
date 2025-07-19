@@ -23,14 +23,12 @@
 
 import 'dart:async';
 
-import 'package:j3tunes/services/youtube_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:j3tunes/extensions/l10n.dart';
-import 'package:j3tunes/main.dart';
-import 'package:j3tunes/services/data_manager.dart';
+import 'package:j3tunes/main.dart' as main_app;
+import 'package:j3tunes/services/data_manager.dart' as data_manager;
 import 'package:j3tunes/utilities/common_variables.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:j3tunes/utilities/utils.dart';
@@ -130,7 +128,7 @@ class _SearchPageState extends State<SearchPage> {
 
   // Search history load karne ka function (ab sahi async/await ke sath)
   void loadSearchHistory() async {
-    final history = await getData('user', 'searchHistory');
+    final history = await data_manager.getData('user', 'searchHistory');
     setState(() {
       searchHistory = List<String>.from((history as Iterable<dynamic>));
     });
@@ -144,7 +142,7 @@ class _SearchPageState extends State<SearchPage> {
         if (searchHistory.length > 10) {
           searchHistory.removeLast();
         }
-        addOrUpdateData('user', 'searchHistory', searchHistory);
+        data_manager.addOrUpdateData('user', 'searchHistory', searchHistory);
       }
 
       setState(() {
@@ -170,7 +168,7 @@ class _SearchPageState extends State<SearchPage> {
     setState(() {
       searchHistory.clear();
     });
-    addOrUpdateData('user', 'searchHistory', []);
+    data_manager.addOrUpdateData('user', 'searchHistory', []);
     showToast(context, 'Search history cleared!');
   }
 
@@ -210,7 +208,7 @@ class _SearchPageState extends State<SearchPage> {
         await _loadPlaylistsWithSongs(query);
         
       } catch (e) {
-        logger.log('Search error: $e', null, null);
+        main_app.logger.log('Search error: $e', null, null);
       } finally {
         if (!mounted) return;
         _fetchingSongs.value = false;
@@ -235,17 +233,30 @@ class _SearchPageState extends State<SearchPage> {
       
       for (final playlist in playlistResults.take(5)) {
         try {
+          // Ensure playlist has proper image
+          String? playlistImage = playlist['image'] ?? 
+                                 playlist['highResImage'] ?? 
+                                 playlist['lowResImage'];
+          
           // Get playlist info with songs
           final playlistInfo = await getPlaylistInfoForWidget(playlist['ytid']);
           if (playlistInfo != null && playlistInfo['list'] != null) {
-            playlistsWithSongs.add(Map<String, dynamic>.from(playlistInfo));
+            final playlistWithImage = Map<String, dynamic>.from(playlistInfo);
+            // Ensure image is preserved
+            if (playlistImage != null) {
+              playlistWithImage['image'] = playlistImage;
+            }
+            playlistsWithSongs.add(playlistWithImage);
           } else {
             // If we can't get songs, still add the playlist but mark it
             playlist['list'] = [];
+            if (playlistImage != null) {
+              playlist['image'] = playlistImage;
+            }
             playlistsWithSongs.add(playlist);
           }
         } catch (e) {
-          logger.log('Error loading playlist ${playlist['ytid']}: $e', null, null);
+          main_app.logger.log('Error loading playlist ${playlist['ytid']}: $e', null, null);
           // Add playlist without songs as fallback
           playlist['list'] = [];
           playlistsWithSongs.add(playlist);
@@ -258,7 +269,7 @@ class _SearchPageState extends State<SearchPage> {
       });
       
     } catch (e) {
-      logger.log('Error loading playlists: $e', null, null);
+      main_app.logger.log('Error loading playlists: $e', null, null);
     }
   }
 
@@ -428,7 +439,7 @@ class _SearchPageState extends State<SearchPage> {
                             setState(() {
                               searchHistory.remove(query);
                             });
-                            await addOrUpdateData(
+                            await data_manager.addOrUpdateData(
                                 'user', 'searchHistory', searchHistory);
                           }
                         },
@@ -524,8 +535,11 @@ class _SearchPageState extends State<SearchPage> {
                             playlist['title'],
                             playlistId: playlist['ytid'],
                             playlistData: playlist, // Pass the full playlist data with songs
-                            playlistArtwork: playlist['image'],
+                            playlistArtwork: playlist['image'] ?? playlist['highResImage'] ?? playlist['lowResImage'], // Ensure image is passed
                             cubeIcon: FluentIcons.apps_list_24_filled,
+                            borderRadius: getItemBorderRadius(index, _playlistsSearchResult.length > maxSongsInList
+                                ? maxSongsInList
+                                : _playlistsSearchResult.length,),
                           );
                         },
                       ),

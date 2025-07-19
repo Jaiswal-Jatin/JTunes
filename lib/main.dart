@@ -1,4 +1,4 @@
-// ignore_for_file: unused_field
+// ignore_for_file: unused_field, unused_import
 
 import 'dart:async';
 
@@ -15,7 +15,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:j3tunes/extensions/l10n.dart';
 import 'package:j3tunes/services/audio_service.dart';
-import 'package:j3tunes/services/data_manager.dart';
+import 'package:j3tunes/services/data_manager.dart' hide addOrUpdateData;
 import 'package:j3tunes/services/io_service.dart';
 import 'package:j3tunes/services/logger_service.dart';
 import 'package:j3tunes/services/playlist_sharing.dart';

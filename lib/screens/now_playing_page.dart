@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_redundant_argument_values
+
 import 'package:j3tunes/widgets/song_bar.dart';
 import 'package:j3tunes/widgets/spinner.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
@@ -6,6 +8,7 @@ import 'package:j3tunes/API/musify.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_flip_card/flutter_flip_card.dart';
 import 'package:j3tunes/extensions/l10n.dart';
@@ -21,7 +24,6 @@ import 'package:j3tunes/utilities/mediaitem.dart';
 import 'package:j3tunes/utilities/utils.dart';
 import 'package:j3tunes/widgets/marque.dart';
 import 'package:j3tunes/widgets/playback_icon_button.dart';
-import 'package:j3tunes/widgets/song_artwork.dart';
 
 /// Call this function instead of Navigator.push to open NowPlayingPage with a smooth slide-up animation.
 void showNowPlayingPage(BuildContext context) {
@@ -213,7 +215,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
             captionLanguage: 'en',
             showLiveFullscreenButton: true,
             hideControls: true,
-            controlsVisibleAtStart: true,
+            controlsVisibleAtStart: false,
             forceHD: false,
             useHybridComposition: false,
           ),
@@ -341,7 +343,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                 elevation: 0,
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  splashColor: Colors.transparent,
+                  splashColor: Colors.white,
                   onPressed: () {
                     Navigator.pop(context);
                   },
@@ -698,43 +700,70 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
       color: Colors.white,
     );
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(_radius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.4),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-            spreadRadius: 2,
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Overlay behind the artwork for separation from blurred background
+        Container(
+          width: imageSize + 32,
+          height: imageSize + 32,
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.45),
+            borderRadius: BorderRadius.circular(_radius + 16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.5),
+                blurRadius: 32,
+                offset: const Offset(0, 12),
+                spreadRadius: 4,
+              ),
+            ],
           ),
-        ],
-      ),
-      child: GestureDetector(
-        onTap: () {
-          if (!offlineMode.value) {
-            setState(() {
-              cardModeNotifier.value =
-                  cardModeNotifier.value == CardDisplayMode.artwork
-                      ? CardDisplayMode.lyrics
-                      : CardDisplayMode.artwork;
-            });
-          }
-        },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(_radius),
-          child: SizedBox(
-            width: imageSize,
-            height: imageSize,
-            child: ValueListenableBuilder<CardDisplayMode>(
-              valueListenable: cardModeNotifier,
-              builder: (context, mode, child) {
-                return _buildCardContent(imageSize, _radius, lyricsTextStyle, mode);
-              },
+        ),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(_radius),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.18),
+              width: 2.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.4),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: GestureDetector(
+            onTap: () {
+              if (!offlineMode.value) {
+                setState(() {
+                  cardModeNotifier.value =
+                      cardModeNotifier.value == CardDisplayMode.artwork
+                          ? CardDisplayMode.lyrics
+                          : CardDisplayMode.artwork;
+                });
+              }
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(_radius),
+              child: SizedBox(
+                width: imageSize,
+                height: imageSize,
+                child: ValueListenableBuilder<CardDisplayMode>(
+                  valueListenable: cardModeNotifier,
+                  builder: (context, mode, child) {
+                    return _buildCardContent(
+                        imageSize, _radius, lyricsTextStyle, mode);
+                  },
+                ),
+              ),
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -742,11 +771,49 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
       TextStyle lyricsTextStyle, CardDisplayMode mode) {
     switch (mode) {
       case CardDisplayMode.artwork:
-        return SongArtworkWidget(
-          metadata: widget.metadata,
-          size: imageSize,
-          errorWidgetIconSize: widget.size.width / 8,
-          borderRadius: radius,
+        // Always try to use the highest quality image available
+        final artUri = widget.metadata.artUri?.toString();
+        final hiRes =
+            (widget.metadata.extras?['highResImage'] as String?)?.trim();
+        final imageUrl = (hiRes != null && hiRes.isNotEmpty)
+            ? hiRes
+            : (artUri != null && artUri.isNotEmpty)
+                ? artUri
+                : null;
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(radius),
+          child: imageUrl != null && imageUrl.isNotEmpty
+              ? CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  width: imageSize,
+                  height: imageSize,
+                  fit: BoxFit.cover,
+                  memCacheWidth: (imageSize * 4).toInt(),
+                  memCacheHeight: (imageSize * 4).toInt(),
+                  filterQuality: FilterQuality.high,
+                  placeholder: (context, url) => Center(
+                    child: SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Image.asset(
+                    'assets/images/JTunes.png',
+                    fit: BoxFit.cover,
+                    width: imageSize,
+                    height: imageSize,
+                  ),
+                )
+              : Image.asset(
+                  'assets/images/JTunes.png',
+                  fit: BoxFit.cover,
+                  width: imageSize,
+                  height: imageSize,
+                ),
         );
 
       case CardDisplayMode.lyrics:
@@ -758,10 +825,7 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Theme.of(context)
-                    .colorScheme
-                    .primaryContainer
-                    .withOpacity(0.8),
+                Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
                 Theme.of(context)
                     .colorScheme
                     .secondaryContainer
@@ -1119,6 +1183,80 @@ class _PositionSliderState extends State<PositionSlider> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        // Video control buttons above slider (only show in video mode)
+        if (widget.isVideoMode && widget.youtubeController != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Speed control button
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: PopupMenuButton<double>(
+                    icon: Icon(
+                      Icons.speed,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    color: Colors.black.withOpacity(0.8),
+                    onSelected: (speed) {
+                      widget.youtubeController!.setPlaybackRate(speed);
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                          value: 0.5,
+                          child: Text('0.5x',
+                              style: TextStyle(color: Colors.white))),
+                      PopupMenuItem(
+                          value: 0.75,
+                          child: Text('0.75x',
+                              style: TextStyle(color: Colors.white))),
+                      PopupMenuItem(
+                          value: 1.0,
+                          child: Text('1x',
+                              style: TextStyle(color: Colors.white))),
+                      PopupMenuItem(
+                          value: 1.25,
+                          child: Text('1.25x',
+                              style: TextStyle(color: Colors.white))),
+                      PopupMenuItem(
+                          value: 1.5,
+                          child: Text('1.5x',
+                              style: TextStyle(color: Colors.white))),
+                      PopupMenuItem(
+                          value: 2.0,
+                          child: Text('2x',
+                              style: TextStyle(color: Colors.white))),
+                    ],
+                  ),
+                ),
+                // Full screen button
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.fullscreen,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    onPressed: () {
+                      widget.youtubeController!.toggleFullScreenMode();
+                    },
+                    padding: EdgeInsets.all(6),
+                    constraints: BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
             activeTrackColor: Colors.white,

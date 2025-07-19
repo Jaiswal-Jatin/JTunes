@@ -5,7 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:j3tunes/extensions/l10n.dart';
-import 'package:j3tunes/main.dart';
+import 'package:j3tunes/main.dart' hide logger;
 import 'package:j3tunes/utilities/common_variables.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:j3tunes/utilities/formatter.dart';
@@ -183,6 +183,17 @@ class _SongBarState extends State<SongBar> {
         safeSong is Map &&
         safeSong['duration'] != null;
 
+    // Prefer highResImage or artUri if available, fallback to lowResImage
+    final hiRes = (safeSong['highResImage'] as String?)?.trim();
+    final artUri = (safeSong['artUri'] as String?)?.trim();
+    final imageUrl = (hiRes != null && hiRes.isNotEmpty)
+        ? hiRes
+        : (artUri != null && artUri.isNotEmpty)
+            ? artUri
+            : (_lowResImageUrl != null && _lowResImageUrl!.isNotEmpty)
+                ? _lowResImageUrl
+                : null;
+
     if (_artworkPath != null && _artworkPath!.isNotEmpty) {
       return SizedBox(
         width: size,
@@ -205,22 +216,24 @@ class _SongBarState extends State<SongBar> {
         child: Stack(
           alignment: Alignment.center,
           children: <Widget>[
-            CachedNetworkImage(
-              key: ValueKey(_lowResImageUrl ?? ''),
-              width: size,
-              height: size,
-              imageUrl: _lowResImageUrl ?? '',
-              memCacheWidth:
-                  (size * MediaQuery.of(context).devicePixelRatio).round(),
-              memCacheHeight:
-                  (size * MediaQuery.of(context).devicePixelRatio).round(),
-              imageBuilder: (context, imageProvider) => Image(
-                image: imageProvider,
-                fit: BoxFit.cover,
-              ),
-              errorWidget: (context, url, error) =>
-                  const NullArtworkWidget(iconSize: 30),
-            ),
+            imageUrl != null && imageUrl.isNotEmpty
+                ? CachedNetworkImage(
+                    key: ValueKey(imageUrl),
+                    width: size,
+                    height: size,
+                    imageUrl: imageUrl,
+                    memCacheWidth: (size * 3).toInt(),
+                    memCacheHeight: (size * 3).toInt(),
+                    filterQuality: FilterQuality.high,
+                    imageBuilder: (context, imageProvider) => Image(
+                      image: imageProvider,
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.high,
+                    ),
+                    errorWidget: (context, url, error) =>
+                        const NullArtworkWidget(iconSize: 30),
+                  )
+                : const NullArtworkWidget(iconSize: 30),
             if (isDurationAvailable)
               SizedBox(
                 width: size - 10,

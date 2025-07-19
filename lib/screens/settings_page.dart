@@ -21,7 +21,7 @@
  *     please visit: https://github.com/gokadzev/J3Tunes
  */
 
-import 'package:j3tunes/API/musify.dart';
+import 'package:j3tunes/API/musify.dart' as musify;
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:j3tunes/extensions/l10n.dart';
@@ -601,7 +601,7 @@ class _SettingsPageState extends State<SettingsPage> {
           onCancel: () => {Navigator.of(context).pop()},
           onSubmit: () => {
             Navigator.of(context).pop(),
-            userRecentlyPlayed = [],
+            musify.userRecentlyPlayed = [],
             deleteData('user', 'recentlyPlayedSongs'),
             showToast(context, '${context.l10n!.recentlyPlayedMsg}!'),
           },

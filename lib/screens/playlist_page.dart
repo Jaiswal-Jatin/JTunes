@@ -1,3 +1,4 @@
+import 'package:j3tunes/widgets/shimmer_widgets.dart';
 // ignore_for_file: directives_ordering, unused_field, prefer_final_fields
 
 /*
@@ -23,7 +24,9 @@
 
 import 'dart:math';
 
-import 'package:j3tunes/services/jiosaavn_service.dart';
+import 'package:j3tunes/API/musify.dart' as musify;
+import 'package:j3tunes/API/musify.dart';
+import 'package:j3tunes/services/data_manager.dart' as data_manager;
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -130,40 +133,62 @@ class _PlaylistPageState extends State<PlaylistPage> {
     if (!mounted) return;
     try {
       if (widget.playlistData != null) {
-        // JioSaavn playlist data passed from home
-        _playlist = widget.playlistData;
+        // Playlist data passed from library or search
+        _playlist = Map<String, dynamic>.from(widget.playlistData);
+
+        // Ensure the playlist has a proper list
+        if (_playlist['list'] == null || (_playlist['list'] as List).isEmpty) {
+          // Try to load songs if playlist doesn't have them
+          if (_playlist['ytid'] != null && _playlist['ytid'].isNotEmpty) {
+            try {
+              final playlistInfo =
+                  await getPlaylistInfoForWidget(_playlist['ytid']);
+              if (playlistInfo != null && playlistInfo['list'] != null) {
+                _playlist['list'] = playlistInfo['list'];
+              }
+            } catch (e) {
+              musify.logger.log('Error loading playlist songs: $e', null, null);
+              _playlist['list'] = [];
+            }
+          } else {
+            _playlist['list'] = [];
+          }
+        }
       } else if (widget.playlistId != null && widget.playlistId!.isNotEmpty) {
-        // Fetch playlist from JioSaavn by ID (if supported by your service)
-        final jioSaavn = JioSaavnService();
-        final playlists = await jioSaavn.fetchPlaylists();
-        final found = playlists.firstWhere(
-          (p) => p.id == widget.playlistId,
-          orElse: () => null,
-        );
-        if (found != null) {
-          _playlist = found;
-        } else {
+        // Fetch playlist by ID
+        try {
+          final playlistInfo =
+              await getPlaylistInfoForWidget(widget.playlistId!);
+          if (playlistInfo != null) {
+            _playlist = playlistInfo;
+          } else {
+            _playlist = {
+              'list': [],
+              'title': 'Playlist Not Found',
+              'ytid': widget.playlistId ?? '',
+              'image': '',
+            };
+          }
+        } catch (e) {
+          musify.logger.log('Error fetching playlist: $e', null, null);
           _playlist = {
             'list': [],
-            'title': 'No Playlist Found',
-            'source': 'jiosaavn',
-            'id': widget.playlistId ?? '',
+            'title': 'Error Loading Playlist',
+            'ytid': widget.playlistId ?? '',
+            'image': '',
           };
         }
       } else {
         _playlist = {
           'list': [],
           'title': 'Empty Playlist',
-          'source': 'jiosaavn',
-          'id': '',
+          'ytid': '',
+          'image': '',
         };
       }
 
-      // JioSaavn playlist: songs are usually in 'songs' or 'list' key
-      if (_playlist != null &&
-          (_playlist['songs'] is List || _playlist['list'] is List)) {
-        _playlist['list'] = _playlist['songs'] ?? _playlist['list'] ?? [];
-      } else {
+      // Ensure list is always initialized
+      if (_playlist['list'] == null) {
         _playlist['list'] = [];
       }
 
@@ -173,11 +198,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
         _songsList.clear();
         _currentPage = 0;
         _currentLastLoadedId = 0;
-        _hasMore = true;
+        _hasMore = (_playlist['list'] as List).isNotEmpty;
         _loadMore();
       }
     } catch (e) {
-      logger.log('Error initializing playlist: $e', null, null);
+      musify.logger.log('Error initializing playlist: $e', null, null);
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -232,7 +257,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
       _currentPage++;
       return list;
     } catch (e, stackTrace) {
-      logger.log('Error fetching playlist songs:', e, stackTrace);
+      musify.logger.log('Error fetching playlist songs:', e, stackTrace);
       return [];
     }
   }
@@ -274,8 +299,21 @@ class _PlaylistPageState extends State<PlaylistPage> {
           ],
         ],
       ),
-      body: _playlist != null
-          ? CustomScrollView(
+      body: _playlist == null || _isLoading
+          ? SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    PlaylistHeaderShimmer(),
+                    SizedBox(height: 20),
+                    PlaylistSongListShimmer(),
+                  ],
+                ),
+              ),
+            )
+          : CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
@@ -307,10 +345,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
                   ),
                 ),
               ],
-            )
-          : SizedBox(
-              height: MediaQuery.sizeOf(context).height - 100,
-              child: const Spinner(),
             ),
     );
   }
@@ -349,9 +383,23 @@ class _PlaylistPageState extends State<PlaylistPage> {
           onPressed: () async {
             playlistLikeStatus.value = !playlistLikeStatus.value;
             await updatePlaylistLikeStatus(
-              _playlist['ytid'],
+              _playlist['ytid'] ?? widget.playlistId,
               playlistLikeStatus.value,
             );
+
+            // Update the global liked playlists list to refresh library
+            if (playlistLikeStatus.value) {
+              if (!userLikedPlaylists.contains(_playlist)) {
+                userLikedPlaylists.add(_playlist);
+              }
+            } else {
+              userLikedPlaylists.removeWhere(
+                  (p) => p['ytid'] == (_playlist['ytid'] ?? widget.playlistId));
+            }
+
+            // Update the length notifier to trigger library refresh
+            currentLikedPlaylistsLength.value = userLikedPlaylists.length;
+
             setState(() {});
           },
         );
@@ -468,8 +516,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
                           userCustomPlaylists.value,
                         );
                         updatedPlaylists[index] = newPlaylist;
-                        userCustomPlaylists.value = updatedPlaylists;
-                        addOrUpdateData(
+                        data_manager.addOrUpdateData(
                           'user',
                           'customPlaylists',
                           userCustomPlaylists.value,

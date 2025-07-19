@@ -1,4 +1,4 @@
-// ignore_for_file: unused_local_variable, omit_local_variable_types, cascade_invocations, require_trailing_commas, directives_ordering
+// ignore_for_file: unused_local_variable, omit_local_variable_types, cascade_invocations, require_trailing_commas, directives_ordering, unused_import
 
 /*
  *     Copyright (C) 2025 Valeri Gokadze
@@ -24,6 +24,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
@@ -34,6 +35,7 @@ import 'package:j3tunes/extensions/l10n.dart';
 import 'package:j3tunes/main.dart';
 import 'package:j3tunes/services/data_manager.dart';
 import 'package:j3tunes/services/io_service.dart';
+import 'package:j3tunes/services/logger_service.dart';
 import 'package:j3tunes/services/lyrics_manager.dart';
 import 'package:j3tunes/services/settings_manager.dart' as settings_manager
     hide defaultRecommendations;
@@ -41,6 +43,7 @@ import 'package:j3tunes/services/settings_manager.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:j3tunes/utilities/formatter.dart';
 import 'package:j3tunes/utilities/utils.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 final _yt = YoutubeExplode();
@@ -769,7 +772,6 @@ Future<String?> getSong(String songId, bool isLive) async {
     final cachedUrl = await getData(
       'cache',
       cacheKey,
-      cachingDuration: _cacheDuration,
     );
 
     if (cachedUrl != null && cachedUrl is String && cachedUrl.isNotEmpty) {
@@ -1275,4 +1277,83 @@ bool isSongContent(dynamic video) {
       author.contains('records');
 
   return !hasNegativeKeyword && isValidDuration;
+}
+
+
+final logger = Logger();
+
+Future<Map<String, dynamic>?> getPlaylistInfoHead(String playlistId) async {
+  // Placeholder for actual implementation.  Replace with your YouTube API call.
+  // This is just a stub.
+  await Future.delayed(Duration(milliseconds: 500)); // Simulate network delay
+  if (playlistId == "error") {
+    throw Exception("Simulated API Error");
+  }
+  if (playlistId == "empty") {
+    return {};
+  }
+
+  return {
+    'title': 'My Playlist',
+    'description': 'A great playlist',
+    'itemCount': 10,
+    'thumbnail': 'https://example.com/thumbnail.jpg',
+  };
+}
+
+Future<void> addOrUpdateData(String group, String key, dynamic value) async {
+  final prefs = await SharedPreferences.getInstance();
+  if (value is String) {
+    await prefs.setString('$group-$key', value);
+  } else if (value is int) {
+    await prefs.setInt('$group-$key', value);
+  } else if (value is double) {
+    await prefs.setDouble('$group-$key', value);
+  } else if (value is bool) {
+    await prefs.setBool('$group-$key', value);
+  } else if (value is List<String>) {
+    await prefs.setStringList('$group-$key', value);
+  } else if (value is Map<String, dynamic>) {
+    // Convert Map to String before saving
+    await prefs.setString('$group-$key', value.toString());
+  } else {
+    logger.log('Unsupported data type for caching: ${value.runtimeType}', null, null);
+  }
+}
+
+Future<dynamic> getData(String group, String key) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.get('$group-$key');
+}
+
+Future<Map<String, dynamic>?> getPlaylistInfoForWidgetCached(String playlistId) async {
+  try {
+    if (playlistId.isEmpty) return null;
+    
+    // Check cache first
+    final cachedPlaylist = await getData('cache', 'playlist_$playlistId');
+    if (cachedPlaylist != null) {
+      try {
+        // Attempt to parse the cached string as a Map
+        return Map<String, dynamic>.from(cachedPlaylist as Map);
+      } catch (e) {
+        // Handle parsing errors, possibly by logging and returning null
+        logger.log('Error parsing cached playlist data: $e', null, null);
+        return null;
+      }
+    }
+    
+    // Try to get from YouTube
+    final playlistInfo = await getPlaylistInfoHead(playlistId);
+    if (playlistInfo != null) {
+      // Cache the result
+      await addOrUpdateData('cache', 'playlist_$playlistId', playlistInfo);
+      return playlistInfo;
+    }
+    
+    return null;
+  } catch (e) {
+    logger.log('Error in getPlaylistInfoForWidget: $e', null, null);
+    return null;
+  }
 }

@@ -1,4 +1,4 @@
-// ignore_for_file: directives_ordering, override_on_non_overriding_member, unnecessary_null_comparison, require_trailing_commas, unnecessary_null_in_if_null_operators
+// ignore_for_file: directives_ordering, override_on_non_overriding_member, unnecessary_null_comparison, require_trailing_commas, unnecessary_null_in_if_null_operators, unused_field, unused_import
 
 /*
  *     Copyright (C) 2025 Valeri Gokadze
@@ -28,9 +28,9 @@ import 'package:j3tunes/API/musify.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:j3tunes/main.dart';
+import 'package:j3tunes/main.dart' hide logger;
 import 'package:j3tunes/models/position_data.dart';
-import 'package:j3tunes/services/data_manager.dart';
+import 'package:j3tunes/services/data_manager.dart' hide addOrUpdateData, getData;
 import 'package:j3tunes/services/settings_manager.dart';
 import 'package:j3tunes/services/music_service.dart';
 import 'package:j3tunes/utilities/mediaitem.dart';

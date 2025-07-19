@@ -35,7 +35,27 @@ import 'package:j3tunes/utilities/utils.dart';
 import 'package:j3tunes/widgets/confirmation_dialog.dart';
 import 'package:j3tunes/widgets/playlist_bar.dart';
 import 'package:j3tunes/widgets/section_header.dart';
-import 'package:j3tunes/widgets/section_title.dart';
+import 'package:j3tunes/services/youtube_service.dart';
+
+// Helper to safely convert Map to Map<String, dynamic>
+Map<String, dynamic> safeMapConvert(dynamic map) {
+  if (map == null) return <String, dynamic>{};
+  if (map is Map<String, dynamic>) return map;
+  if (map is Map) {
+    return Map<String, dynamic>.from(map);
+  }
+  return <String, dynamic>{};
+}
+
+// Helper to safely convert List to List<Map<String, dynamic>>
+List<Map<String, dynamic>> safeListConvert(dynamic list) {
+  if (list == null) return <Map<String, dynamic>>[];
+  if (list is List<Map<String, dynamic>>) return list;
+  if (list is List) {
+    return list.map((item) => safeMapConvert(item)).toList();
+  }
+  return <Map<String, dynamic>>[];
+}
 
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
@@ -164,20 +184,103 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Widget _buildUserLikedPlaylistsSection(Color primaryColor) {
-    return ValueListenableBuilder(
-      valueListenable: currentLikedPlaylistsLength,
-      builder: (_, value, __) {
-        return userLikedPlaylists.isNotEmpty
-            ? Column(
-                children: [
-                  SectionTitle(context.l10n!.likedPlaylists, primaryColor),
-                  _buildPlaylistListView(context, userLikedPlaylists),
-                ],
-              )
-            : const SizedBox();
-      },
-    );
+  return ValueListenableBuilder(
+    valueListenable: currentLikedPlaylistsLength,
+    builder: (_, value, __) {
+      // Always show the section if there are any liked playlists
+      if (userLikedPlaylists.isEmpty) {
+        return const SizedBox();
+      }
+      
+      return Column(
+        children: [
+          SectionHeader(title: context.l10n!.likedPlaylists),
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _loadLikedPlaylistsWithSongs(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              } else if (snapshot.hasError) {
+                logger.log('Error in liked playlists section: ${snapshot.error}', null, null);
+                return Center(child: Text('Error loading playlists'));
+              } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                return _buildPlaylistListView(context, snapshot.data!);
+              } else {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text('No liked playlists found'),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
+
+Future<List<Map<String, dynamic>>> _loadLikedPlaylistsWithSongs() async {
+  final playlistsWithSongs = <Map<String, dynamic>>[];
+  final yt = YoutubeService();
+  
+  // Process all liked playlists, not just a subset
+  for (final rawPlaylist in userLikedPlaylists) {
+    try {
+      final playlist = safeMapConvert(rawPlaylist);
+      
+      // Ensure we have a valid ytid
+      if (playlist['ytid'] == null || playlist['ytid'].toString().isEmpty) {
+        logger.log('Skipping playlist with no ytid: ${playlist['title']}', null, null);
+        continue;
+      }
+      
+      // If playlist doesn't have songs, try to load them
+      if (playlist['list'] == null || (playlist['list'] as List).isEmpty) {
+        try {
+          final songMaps = await yt.fetchPlaylistWithFallback(playlist['ytid']);
+          final safeSongMaps = safeListConvert(songMaps);
+          if (safeSongMaps.isNotEmpty) {
+            playlist['list'] = safeSongMaps;
+            // Update image if not present
+            if (playlist['image'] == null || playlist['image'].toString().isEmpty) {
+              playlist['image'] = safeSongMaps.first['image'] ?? 'assets/images/JTunes.png';
+            }
+            // Update title if not present
+            if (playlist['title'] == null || playlist['title'].toString().isEmpty) {
+              playlist['title'] = safeSongMaps.first['title'] ?? 'Liked Playlist';
+            }
+          } else {
+            // Even if no songs, add the playlist with empty list
+            playlist['list'] = <Map<String, dynamic>>[];
+          }
+        } catch (e) {
+          logger.log('Error loading songs for playlist ${playlist['ytid']}: $e', null, null);
+          playlist['list'] = <Map<String, dynamic>>[];
+        }
+      } else {
+        // Ensure existing list is properly converted
+        playlist['list'] = safeListConvert(playlist['list']);
+      }
+      
+      // Always add the playlist, even if it has no songs
+      playlistsWithSongs.add(playlist);
+      
+    } catch (e) {
+      logger.log('Error processing liked playlist: $e', null, null);
+      // Add playlist even if there's an error, but with empty list
+      final playlist = safeMapConvert(rawPlaylist);
+      playlist['list'] = <Map<String, dynamic>>[];
+      if (playlist['ytid'] != null) {
+        playlistsWithSongs.add(playlist);
+      }
+    }
   }
+  
+  logger.log('Loaded ${playlistsWithSongs.length} liked playlists for library', null, null);
+  return playlistsWithSongs;
+}
 
   Widget _buildOfflinePlaylistsSection() {
     return ValueListenableBuilder<List<dynamic>>(
@@ -218,51 +321,59 @@ class _LibraryPageState extends State<LibraryPage> {
     );
   }
 
-  Widget _buildPlaylistListView(
-    BuildContext context,
-    List playlists, {
-    bool isOfflinePlaylists = false,
-  }) {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: playlists.length,
-      padding: commonListViewBottmomPadding,
-      itemBuilder: (BuildContext context, index) {
-        final playlist = playlists[index];
-        final borderRadius = getItemBorderRadius(index, playlists.length);
-
-        // Get first song's image from playlist
-        String? dynamicPlaylistImage = playlist['image'];
-
-        // Check if playlist has songs and get first song's image
-        if (playlist['list'] != null && playlist['list'].isNotEmpty) {
-          final firstSong = playlist['list'][0];
-          dynamicPlaylistImage = firstSong['artUri'] ??
-              firstSong['image'] ??
-              firstSong['highResImage'] ??
-              playlist['image'];
-        }
-
-        return PlaylistBar(
-          key: ValueKey(playlist['ytid']),
-          playlist['title'],
-          playlistId: playlist['ytid'],
-          playlistArtwork: dynamicPlaylistImage, // यहाँ change किया है
-          isAlbum: playlist['isAlbum'],
-          playlistData:
-              playlist['source'] == 'user-created' || isOfflinePlaylists
-                  ? playlist
-                  : null,
-          onDelete: playlist['source'] == 'user-created' ||
-                  playlist['source'] == 'user-youtube'
-              ? () => _showRemovePlaylistDialog(playlist)
-              : null,
-          borderRadius: borderRadius,
-        );
-      },
+Widget _buildPlaylistListView(
+  BuildContext context,
+  List playlists, {
+  bool isOfflinePlaylists = false,
+}) {
+  if (playlists.isEmpty) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Text('No playlists available'),
+      ),
     );
   }
+
+  return ListView.builder(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    itemCount: playlists.length,
+    padding: commonListViewBottmomPadding,
+    itemBuilder: (BuildContext context, index) {
+      final rawPlaylist = playlists[index];
+      final playlist = safeMapConvert(rawPlaylist);
+      final borderRadius = getItemBorderRadius(index, playlists.length);
+
+      // Get first song's image from playlist
+      String? dynamicPlaylistImage = playlist['image'];
+
+      // Check if playlist has songs and get first song's image
+      final playlistSongs = safeListConvert(playlist['list']);
+      if (playlistSongs.isNotEmpty) {
+        final firstSong = playlistSongs.first;
+        dynamicPlaylistImage = firstSong['artUri'] ??
+            firstSong['image'] ??
+            firstSong['highResImage'] ??
+            playlist['image'];
+      }
+
+      return PlaylistBar(
+        key: ValueKey('${playlist['ytid']}_$index'), // More unique key
+        playlist['title'] ?? 'Unknown Playlist',
+        playlistId: playlist['ytid'],
+        playlistArtwork: dynamicPlaylistImage,
+        isAlbum: playlist['isAlbum'] ?? false,
+        playlistData: playlist,
+        onDelete: playlist['source'] == 'user-created' ||
+                playlist['source'] == 'user-youtube'
+            ? () => _showRemovePlaylistDialog(playlist)
+            : null,
+        borderRadius: borderRadius,
+      );
+    },
+  );
+}
 
   void _showAddPlaylistDialog() => showDialog(
         context: context,
@@ -394,7 +505,10 @@ class _LibraryPageState extends State<LibraryPage> {
                     child: Text(context.l10n!.add.toUpperCase()),
                     onPressed: () async {
                       if (isYouTubeMode && id.isNotEmpty) {
-                        showToast(context, await addUserPlaylist(id, context));
+                        final result = await addUserPlaylist(id, context);
+                        showToast(context, result);
+                        // Refresh the liked playlists to show in library
+                        setState(() {});
                       } else if (!isYouTubeMode &&
                           customPlaylistName.isNotEmpty) {
                         showToast(
@@ -422,7 +536,7 @@ class _LibraryPageState extends State<LibraryPage> {
         },
       );
 
-  void _showRemovePlaylistDialog(Map playlist) => showDialog(
+  void _showRemovePlaylistDialog(Map<String, dynamic> playlist) => showDialog(
         context: context,
         builder: (BuildContext context) {
           return ConfirmationDialog(
@@ -440,6 +554,8 @@ class _LibraryPageState extends State<LibraryPage> {
               } else {
                 removeUserPlaylist(playlist['ytid']);
               }
+              // Refresh the page to update the UI
+              setState(() {});
             },
           );
         },

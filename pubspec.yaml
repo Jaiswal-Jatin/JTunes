@@ -12,7 +12,7 @@ dependencies:
   app_links: 
   audio_service: 
   audio_session: 
-  cached_network_image: 
+  cached_network_image: ^3.3.1
   dynamic_color: 
   file_picker: 
   fluentui_system_icons: 
@@ -43,6 +43,8 @@ dependencies:
   home_widget: 
   workmanager: 
   youtube_player_flutter: ^9.1.1
+  shimmer: ^3.0.0
+  lottie: ^3.1.0
  
 
 dev_dependencies:

@@ -26,7 +26,6 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:j3tunes/main.dart';
 import 'package:j3tunes/screens/now_playing_page.dart';
-import 'package:j3tunes/utilities/formatter.dart';
 import 'package:j3tunes/widgets/marque.dart';
 import 'package:j3tunes/widgets/playback_icon_button.dart';
 import 'package:j3tunes/widgets/song_artwork.dart';
@@ -165,170 +164,171 @@ class _MiniPlayerState extends State<MiniPlayer> {
             return GestureDetector(
               onTap: () => showNowPlayingPage(context),
               onVerticalDragEnd: (details) {
-                if (details.primaryVelocity! < -300) {
-                  showNowPlayingPage(context);
-                }
+              if (details.primaryVelocity! < -300) {
+                showNowPlayingPage(context);
+              }
               },
               child: Container(
-                height: _height,
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      dominantColor?.withOpacity(0.9) ??
-                          Theme.of(context).colorScheme.surface,
-                      dominantColor?.withOpacity(0.7) ??
-                          Theme.of(context)
-                              .colorScheme
-                              .surface
-                              .withOpacity(0.8),
+              height: _height,
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), // Reduced horizontal margin
+              width: double.infinity, // Full width
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  dominantColor?.withOpacity(0.9) ??
+                    Theme.of(context).colorScheme.surface,
+                  dominantColor?.withOpacity(0.7) ??
+                    Theme.of(context)
+                      .colorScheme
+                      .surface
+                      .withOpacity(0.8),
+                ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                BoxShadow(
+                  color: (dominantColor ?? Colors.black).withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+                ],
+              ),
+              child: Row(
+                children: [
+                // Song Artwork
+                Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SongArtworkWidget(
+                    metadata: metadata,
+                    size: _imageSize,
+                    errorWidgetIconSize: 25,
+                  ),
+                  ),
+                ),
+
+                // Song Info
+                Expanded(
+                  child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                    MarqueeWidget(
+                      child: Text(
+                      metadata.title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        shadows: [
+                        Shadow(
+                          color: Colors.black.withOpacity(0.7),
+                          offset: const Offset(0, 1),
+                          blurRadius: 2,
+                        ),
+                        ],
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (metadata.artist != null) ...[
+                      const SizedBox(height: 2),
+                      MarqueeWidget(
+                      child: Text(
+                        metadata.artist!,
+                        style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.white.withOpacity(0.9),
+                        shadows: [
+                          Shadow(
+                          color: Colors.black.withOpacity(0.7),
+                          offset: const Offset(0, 1),
+                          blurRadius: 2,
+                          ),
+                        ],
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      ),
+                    ],
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: (dominantColor ?? Colors.black).withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  ),
                 ),
-                child: Row(
+
+                // Control Buttons
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Song Artwork
-                    Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: SongArtworkWidget(
-                          metadata: metadata,
-                          size: _imageSize,
-                          errorWidgetIconSize: 25,
-                        ),
+                  // Previous Button
+                  Container(
+                    decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                    icon: const Icon(FluentIcons.previous_24_filled),
+                    color: Colors.white,
+                    iconSize: 20,
+                    onPressed: audioHandler.hasPrevious
+                      ? audioHandler.skipToPrevious
+                      : null,
+                    splashColor: Colors.transparent,
+                    ),
+                  ),
+
+                  const SizedBox(width: 8),
+
+                  // Play/Pause Button
+                  Container(
+                    decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
                       ),
+                    ],
                     ),
-
-                    // Song Info
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            MarqueeWidget(
-                              child: Text(
-                                metadata.title,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                  shadows: [
-                                    Shadow(
-                                      color: Colors.black.withOpacity(0.7),
-                                      offset: const Offset(0, 1),
-                                      blurRadius: 2,
-                                    ),
-                                  ],
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (metadata.artist != null) ...[
-                              const SizedBox(height: 2),
-                              MarqueeWidget(
-                                child: Text(
-                                  metadata.artist!,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w400,
-                                    color: Colors.white.withOpacity(0.9),
-                                    shadows: [
-                                      Shadow(
-                                        color: Colors.black.withOpacity(0.7),
-                                        offset: const Offset(0, 1),
-                                        blurRadius: 2,
-                                      ),
-                                    ],
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
+                    child: PlaybackIconButton(
+                    iconColor: Colors.black,
+                    backgroundColor: Colors.white,
+                    iconSize: 28,
                     ),
+                  ),
 
-                    // Control Buttons
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Previous Button
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            icon: const Icon(FluentIcons.previous_24_filled),
-                            color: Colors.white,
-                            iconSize: 20,
-                            onPressed: audioHandler.hasPrevious
-                                ? audioHandler.skipToPrevious
-                                : null,
-                            splashColor: Colors.transparent,
-                          ),
-                        ),
+                  const SizedBox(width: 8),
 
-                        const SizedBox(width: 8),
-
-                        // Play/Pause Button
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: PlaybackIconButton(
-                            iconColor: Colors.black,
-                            backgroundColor: Colors.white,
-                            iconSize: 28,
-                          ),
-                        ),
-
-                        const SizedBox(width: 8),
-
-                        // Next Button
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            icon: const Icon(FluentIcons.next_24_filled),
-                            color: Colors.white,
-                            iconSize: 20,
-                            onPressed: audioHandler.hasNext
-                                ? audioHandler.skipToNext
-                                : null,
-                            splashColor: Colors.transparent,
-                          ),
-                        ),
-
-                        const SizedBox(width: 12),
-                      ],
+                  // Next Button
+                  Container(
+                    decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
                     ),
+                    child: IconButton(
+                    icon: const Icon(FluentIcons.next_24_filled),
+                    color: Colors.white,
+                    iconSize: 20,
+                    onPressed: audioHandler.hasNext
+                      ? audioHandler.skipToNext
+                      : null,
+                    splashColor: Colors.transparent,
+                    ),
+                  ),
+
+                  const SizedBox(width: 12),
                   ],
                 ),
+                ],
+              ),
               ),
             );
           },
