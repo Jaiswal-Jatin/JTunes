@@ -152,7 +152,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                         if (metadata == null) {
                           return const SizedBox.shrink();
                         }
-                        return MiniPlayer(metadata: metadata);
+                        return MiniPlayer();
                       },
                     ),
                   ],

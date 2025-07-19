@@ -1,3 +1,5 @@
+// ignore_for_file: directives_ordering, deprecated_member_use, use_decorated_box, prefer_const_declarations, unused_element
+
 /*
  *     Copyright (C) 2025 Valeri Gokadze
  *
@@ -23,351 +25,321 @@ import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:j3tunes/main.dart';
-import 'package:j3tunes/models/position_data.dart';
 import 'package:j3tunes/screens/now_playing_page.dart';
+import 'package:j3tunes/utilities/formatter.dart';
 import 'package:j3tunes/widgets/marque.dart';
+import 'package:j3tunes/widgets/playback_icon_button.dart';
 import 'package:j3tunes/widgets/song_artwork.dart';
+import 'package:palette_generator/palette_generator.dart';
+
+// Global cache for mini player colors
+final Map<String, Color> _miniPlayerColorCache = {};
+
+/// Call this function instead of Navigator.push to open NowPlayingPage with a smooth slide-up animation.
+void showNowPlayingPage(BuildContext context) {
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      transitionDuration: const Duration(milliseconds: 250), // Even faster
+      reverseTransitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (context, animation, secondaryAnimation) =>
+          const NowPlayingPage(),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        final slideAnimation = Tween<Offset>(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(
+          parent: animation,
+          curve: Curves.fastOutSlowIn,
+        ));
+
+        final fadeAnimation = Tween<double>(
+          begin: 0.0,
+          end: 1.0,
+        ).animate(CurvedAnimation(
+          parent: animation,
+          curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+        ));
+
+        return SlideTransition(
+          position: slideAnimation,
+          child: FadeTransition(
+            opacity: fadeAnimation,
+            child: child,
+          ),
+        );
+      },
+      opaque: false,
+      barrierColor: Colors.black.withOpacity(0.2),
+    ),
+  );
+}
 
 class MiniPlayer extends StatefulWidget {
-  const MiniPlayer({super.key, required this.metadata});
-
-  final MediaItem metadata;
+  const MiniPlayer({super.key});
 
   @override
   State<MiniPlayer> createState() => _MiniPlayerState();
 }
 
-class _MiniPlayerState extends State<MiniPlayer>
-    with SingleTickerProviderStateMixin {
-  static const _playerHeight = 75.0;
-  static const _progressBarHeight = 2.0;
-  static const _artworkSize = 55.0;
-  static const _artworkIconSize = 30.0;
-
-  // Animation controller for smooth transitions
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
+class _MiniPlayerState extends State<MiniPlayer> {
+  final ValueNotifier<Color?> _dominantColorNotifier =
+      ValueNotifier<Color?>(null);
+  String? _dominantColorImageUrl;
 
   @override
   void initState() {
     super.initState();
+    // Listen to mediaItem changes for color updates
+    audioHandler.mediaItem.listen((mediaItem) {
+      if (mediaItem != null) {
+        final imageUrl = mediaItem.artUri?.toString();
+        if (imageUrl != null && imageUrl != _dominantColorImageUrl) {
+          _updateDominantColor(imageUrl);
+        }
+      }
+    });
 
-    // Setup animation controller for visual feedback
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 100),
-      vsync: this,
-    );
+    // Get current song immediately for instant color update
+    final currentMediaItem = audioHandler.mediaItem.valueOrNull;
+    if (currentMediaItem != null) {
+      final imageUrl = currentMediaItem.artUri?.toString();
+      if (imageUrl != null) {
+        _updateDominantColor(imageUrl);
+      }
+    }
+  }
 
-    _scaleAnimation = Tween<double>(begin: 1, end: 0.98).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+  Future<void> _updateDominantColor(String imageUrl) async {
+    if (imageUrl == _dominantColorImageUrl) return;
+
+    // Check cache first
+    if (_miniPlayerColorCache.containsKey(imageUrl)) {
+      _dominantColorNotifier.value = _miniPlayerColorCache[imageUrl];
+      _dominantColorImageUrl = imageUrl;
+      return;
+    }
+
+    // Set a default color immediately for instant feedback
+    _dominantColorNotifier.value = Theme.of(context).colorScheme.surface;
+    _dominantColorImageUrl = imageUrl;
+
+    try {
+      final PaletteGenerator palette = await PaletteGenerator.fromImageProvider(
+        NetworkImage(imageUrl),
+        size: const Size(80, 80), // Small size for faster processing
+        maximumColorCount: 8, // Reduced colors for faster processing
+      );
+
+      Color? color = palette.vibrantColor?.color ??
+          palette.dominantColor?.color ??
+          palette.darkVibrantColor?.color ??
+          Theme.of(context).colorScheme.surface;
+
+      // Cache the color
+      _miniPlayerColorCache[imageUrl] = color;
+      _dominantColorNotifier.value = color;
+    } catch (e) {
+      // Keep the default color if extraction fails
+      final defaultColor = Theme.of(context).colorScheme.surface;
+      _miniPlayerColorCache[imageUrl] = defaultColor;
+      _dominantColorNotifier.value = defaultColor;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const _height = 75.0;
+    const _imageSize = 55.0;
+
+    return StreamBuilder<MediaItem?>(
+      stream: audioHandler.mediaItem,
+      builder: (context, snapshot) {
+        final metadata = snapshot.data;
+        if (metadata == null) {
+          return const SizedBox.shrink();
+        }
+
+        return ValueListenableBuilder<Color?>(
+          valueListenable: _dominantColorNotifier,
+          builder: (context, dominantColor, _) {
+            return GestureDetector(
+              onTap: () => showNowPlayingPage(context),
+              onVerticalDragEnd: (details) {
+                if (details.primaryVelocity! < -300) {
+                  showNowPlayingPage(context);
+                }
+              },
+              child: Container(
+                height: _height,
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      dominantColor?.withOpacity(0.9) ??
+                          Theme.of(context).colorScheme.surface,
+                      dominantColor?.withOpacity(0.7) ??
+                          Theme.of(context)
+                              .colorScheme
+                              .surface
+                              .withOpacity(0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (dominantColor ?? Colors.black).withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    // Song Artwork
+                    Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: SongArtworkWidget(
+                          metadata: metadata,
+                          size: _imageSize,
+                          errorWidgetIconSize: 25,
+                        ),
+                      ),
+                    ),
+
+                    // Song Info
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            MarqueeWidget(
+                              child: Text(
+                                metadata.title,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withOpacity(0.7),
+                                      offset: const Offset(0, 1),
+                                      blurRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (metadata.artist != null) ...[
+                              const SizedBox(height: 2),
+                              MarqueeWidget(
+                                child: Text(
+                                  metadata.artist!,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w400,
+                                    color: Colors.white.withOpacity(0.9),
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black.withOpacity(0.7),
+                                        offset: const Offset(0, 1),
+                                        blurRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Control Buttons
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Previous Button
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: IconButton(
+                            icon: const Icon(FluentIcons.previous_24_filled),
+                            color: Colors.white,
+                            iconSize: 20,
+                            onPressed: audioHandler.hasPrevious
+                                ? audioHandler.skipToPrevious
+                                : null,
+                            splashColor: Colors.transparent,
+                          ),
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        // Play/Pause Button
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: PlaybackIconButton(
+                            iconColor: Colors.black,
+                            backgroundColor: Colors.white,
+                            iconSize: 28,
+                          ),
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        // Next Button
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: IconButton(
+                            icon: const Icon(FluentIcons.next_24_filled),
+                            color: Colors.white,
+                            iconSize: 20,
+                            onPressed: audioHandler.hasNext
+                                ? audioHandler.skipToNext
+                                : null,
+                            splashColor: Colors.transparent,
+                          ),
+                        ),
+
+                        const SizedBox(width: 12),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _dominantColorNotifier.dispose();
     super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return AnimatedBuilder(
-      animation: _scaleAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _scaleAnimation.value,
-          child: GestureDetector(
-            onTapDown: (_) => _animationController.forward(),
-            onTapUp: (_) => _animationController.reverse(),
-            onTapCancel: () => _animationController.reverse(),
-            onVerticalDragUpdate: _handleVerticalDrag,
-            onTap: _navigateToNowPlaying,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildPlayerBody(colorScheme),
-                _buildProgressBar(colorScheme),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildPlayerBody(ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      height: _playerHeight,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 4,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          _ArtworkWidget(metadata: widget.metadata),
-          _MetadataWidget(
-            title: widget.metadata.title,
-            artist: widget.metadata.artist,
-            titleColor: colorScheme.primary,
-            artistColor: colorScheme.secondary,
-          ),
-          _ControlsWidget(colorScheme: colorScheme),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressBar(ColorScheme colorScheme) {
-    return StreamBuilder<PositionData>(
-      stream: audioHandler.positionDataStream,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.hasError) {
-          return const SizedBox.shrink();
-        }
-
-        final positionData =
-            snapshot.data ??
-            PositionData(Duration.zero, Duration.zero, Duration.zero);
-        final duration = positionData.duration;
-
-        final progress = (positionData.position.inSeconds / duration.inSeconds)
-            .clamp(0.0, 1.0);
-
-        return LinearProgressIndicator(
-          value: progress,
-          minHeight: _progressBarHeight,
-          backgroundColor: colorScheme.surfaceContainer,
-          valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
-        );
-      },
-    );
-  }
-
-  void _handleVerticalDrag(DragUpdateDetails details) {
-    // Only navigate on upward swipe
-    if (details.primaryDelta! < -10) {
-      _navigateToNowPlaying();
-    }
-  }
-
-  void _navigateToNowPlaying() {
-    Navigator.push(context, _createSlideTransition());
-  }
-
-  PageRoute _createSlideTransition() {
-    return PageRouteBuilder<void>(
-      pageBuilder: (context, animation, _) => const NowPlayingPage(),
-      reverseTransitionDuration: const Duration(milliseconds: 250),
-      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        const begin = Offset(0, 1);
-        const end = Offset.zero;
-        const curve = Curves.easeInOut;
-
-        final tween = Tween(
-          begin: begin,
-          end: end,
-        ).chain(CurveTween(curve: curve));
-
-        return SlideTransition(position: animation.drive(tween), child: child);
-      },
-    );
-  }
-}
-
-class _ArtworkWidget extends StatelessWidget {
-  const _ArtworkWidget({required this.metadata});
-
-  final MediaItem metadata;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 7, bottom: 7, right: 15),
-      child: Hero(
-        tag: 'now_playing_artwork',
-        child: SongArtworkWidget(
-          metadata: metadata,
-          size: _MiniPlayerState._artworkSize,
-          errorWidgetIconSize: _MiniPlayerState._artworkIconSize,
-          borderRadius: 8,
-        ),
-      ),
-    );
-  }
-}
-
-class _MetadataWidget extends StatelessWidget {
-  const _MetadataWidget({
-    required this.title,
-    required this.artist,
-    required this.titleColor,
-    required this.artistColor,
-  });
-
-  final String title;
-  final String? artist;
-  final Color titleColor;
-  final Color artistColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: MarqueeWidget(
-            manualScrollEnabled: false,
-            animationDuration: const Duration(seconds: 8),
-            backDuration: const Duration(seconds: 2),
-            pauseDuration: const Duration(seconds: 2),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: titleColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    height: 1.2,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (artist != null && artist!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    artist!,
-                    style: TextStyle(
-                      color: artistColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.normal,
-                      height: 1.2,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ControlsWidget extends StatelessWidget {
-  const _ControlsWidget({required this.colorScheme});
-
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _PlayPauseButton(colorScheme: colorScheme),
-        _NextButton(colorScheme: colorScheme),
-      ],
-    );
-  }
-}
-
-class _PlayPauseButton extends StatelessWidget {
-  const _PlayPauseButton({required this.colorScheme});
-
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<PlaybackState>(
-      stream: audioHandler.playbackState.distinct((previous, current) {
-        // Only rebuild if relevant state changes
-        return previous.playing == current.playing &&
-            previous.processingState == current.processingState;
-      }),
-      builder: (context, snapshot) {
-        final playbackState = snapshot.data;
-        final processingState = playbackState?.processingState;
-        final isPlaying = playbackState?.playing ?? false;
-
-        Widget iconWidget;
-        VoidCallback? onPressed;
-
-        if (processingState == AudioProcessingState.loading ||
-            processingState == AudioProcessingState.buffering) {
-          iconWidget = SizedBox(
-            width: 35,
-            height: 35,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.5,
-              valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
-            ),
-          );
-          onPressed = null;
-        } else {
-          final iconData =
-              isPlaying
-                  ? FluentIcons.pause_24_filled
-                  : FluentIcons.play_24_filled;
-
-          iconWidget = Icon(iconData, color: colorScheme.primary, size: 35);
-
-          onPressed = isPlaying ? audioHandler.pause : audioHandler.play;
-        }
-
-        return GestureDetector(
-          onTap: onPressed,
-          child: Container(padding: const EdgeInsets.all(4), child: iconWidget),
-        );
-      },
-    );
-  }
-}
-
-class _NextButton extends StatelessWidget {
-  const _NextButton({required this.colorScheme});
-
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<MediaItem>>(
-      stream: audioHandler.queue,
-      builder: (context, snapshot) {
-        final hasNext = audioHandler.hasNext;
-
-        if (!hasNext) {
-          return const SizedBox.shrink();
-        }
-
-        return Padding(
-          padding: const EdgeInsets.only(left: 10),
-          child: GestureDetector(
-            onTap: audioHandler.skipToNext,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              child: Icon(
-                FluentIcons.next_24_filled,
-                color: colorScheme.primary,
-                size: 25,
-              ),
-            ),
-          ),
-        );
-      },
-    );
   }
 }

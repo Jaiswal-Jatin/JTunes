@@ -25,6 +25,7 @@ import 'package:j3tunes/services/update_manager.dart';
 import 'package:j3tunes/style/app_themes.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:path_provider/path_provider.dart';
+
 /// Global notifier for the currently selected song (for instant SongBar update)
 final ValueNotifier<Map<String, dynamic>?> currentSongNotifier = ValueNotifier<Map<String, dynamic>?>(null);
 
@@ -167,10 +168,10 @@ class _J3TunesState extends State<J3Tunes> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Ye line uncomment karo restart ke liye
+    // App restart ke liye - splash screen se start hoga
     if (_lastLifecycleState == AppLifecycleState.paused &&
         state == AppLifecycleState.resumed) {
-      NavigationManager.router.go('/');
+      NavigationManager.router.go('/splash');
     }
     _lastLifecycleState = state;
   }
@@ -212,7 +213,7 @@ class _J3TunesState extends State<J3Tunes> with WidgetsBindingObserver {
             ],
             supportedLocales: appSupportedLocales,
             locale: languageSetting,
-            routerConfig: NavigationManager.router,
+            routerConfig: NavigationManager.router, // Router automatically starts with /splash
           ),
         );
       },
@@ -280,15 +281,6 @@ Future<void> initialisation() async {
   applicationDirPath = (await getApplicationDocumentsDirectory()).path;
   await FilePaths.ensureDirectoriesExist();
 }
-
-// Background task callback
-@pragma('vm:entry-point')
-// void callbackDispatcher() {
-//   Workmanager().executeTask((task, inputData) async {
-//     // Background में widget update tasks
-//     return Future.value(true);
-//   });
-// }
 
 void handleIncomingLink(Uri? uri) async {
   if (uri != null && uri.scheme == 'J3Tunes' && uri.host == 'playlist') {

@@ -40,6 +40,7 @@ import 'package:j3tunes/widgets/custom_search_bar.dart';
 import 'package:j3tunes/widgets/playlist_bar.dart';
 import 'package:j3tunes/widgets/section_title.dart';
 import 'package:j3tunes/widgets/song_bar.dart';
+import 'package:j3tunes/API/musify.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -173,7 +174,7 @@ class _SearchPageState extends State<SearchPage> {
     showToast(context, 'Search history cleared!');
   }
 
-  // performSearch function ko replace karo
+  // Enhanced performSearch function with better playlist handling
   Future<void> performSearch(String query) async {
     _debounceTimer?.cancel();
 
@@ -197,72 +198,17 @@ class _SearchPageState extends State<SearchPage> {
           _playlistsSearchResult.clear();
         });
 
-        final youtubeService = YoutubeService();
-        final songResults =
-            await youtubeService.searchVideos(query, maxResults: 20);
-
-        // Spotify-style: Only show songs between 2 min (120 sec) and 7 min (420 sec) and filter out non-songs
-        final List<String> nonSongKeywords = [
-          'top',
-          'most',
-          'list',
-          'cities',
-          'cream',
-          'sector',
-          'invest',
-          'billion',
-          'viewed',
-          'moisturizer',
-          'part',
-          'year',
-          'quarter',
-          'future',
-          'news',
-          'update',
-          'trending',
-          'chart',
-          'countdown',
-          'mix',
-          'dj',
-          'remix',
-          'mashup',
-          'nonstop',
-          'hour',
-          'minutes',
-          'sec',
-          'live',
-          'session',
-          'radio',
-          'podcast',
-          '2025',
-          '2024',
-          '2023',
-          '2022',
-          '2021',
-          '2020'
-        ];
-        final filteredSongs = songResults
-            .where((song) {
-              final duration = song.duration?.inSeconds ?? 0;
-              String title = song.title.toLowerCase();
-              String desc = song.description.toLowerCase();
-              for (final word in nonSongKeywords) {
-                if (title.contains(word) || desc.contains(word)) {
-                  return false;
-                }
-              }
-              // Only allow songs between 2 min (120 sec) and 7 min (420 sec)
-              return duration >= 120 && duration <= 420;
-            })
-            .map((song) => videoToMap(song))
-            .toList();
-
+        // Search for songs using the enhanced search function
+        final songResults = await search(query, 'song');
+        
         if (!mounted) return;
         setState(() {
-          _songsSearchResult = filteredSongs.take(20).toList();
+          _songsSearchResult = songResults.take(20).toList();
         });
 
-        _loadAlbumsAndPlaylists(query);
+        // Search for playlists with proper song loading
+        await _loadPlaylistsWithSongs(query);
+        
       } catch (e) {
         logger.log('Search error: $e', null, null);
       } finally {
@@ -276,6 +222,44 @@ class _SearchPageState extends State<SearchPage> {
     setState(() {
       _suggestionsList.clear();
     });
+  }
+
+  // Enhanced playlist loading with songs
+  Future<void> _loadPlaylistsWithSongs(String query) async {
+    try {
+      // Search for playlists using the enhanced search function
+      final playlistResults = await search(query, 'playlist');
+      
+      // Load songs for each playlist
+      final playlistsWithSongs = <Map<String, dynamic>>[];
+      
+      for (final playlist in playlistResults.take(5)) {
+        try {
+          // Get playlist info with songs
+          final playlistInfo = await getPlaylistInfoForWidget(playlist['ytid']);
+          if (playlistInfo != null && playlistInfo['list'] != null) {
+            playlistsWithSongs.add(Map<String, dynamic>.from(playlistInfo));
+          } else {
+            // If we can't get songs, still add the playlist but mark it
+            playlist['list'] = [];
+            playlistsWithSongs.add(playlist);
+          }
+        } catch (e) {
+          logger.log('Error loading playlist ${playlist['ytid']}: $e', null, null);
+          // Add playlist without songs as fallback
+          playlist['list'] = [];
+          playlistsWithSongs.add(playlist);
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _playlistsSearchResult = playlistsWithSongs;
+      });
+      
+    } catch (e) {
+      logger.log('Error loading playlists: $e', null, null);
+    }
   }
 
   // Spotify-style: fetch live suggestions (dummy for now)
@@ -293,24 +277,6 @@ class _SearchPageState extends State<SearchPage> {
     setState(() {
       _suggestionsList = dummySuggestions;
     });
-  }
-
-  // Ye function add karo
-  void _loadAlbumsAndPlaylists(String query) async {
-    try {
-      final youtubeService = YoutubeService();
-      // Use the user's query to get relevant playlists
-      final playlistResults =
-          await youtubeService.searchVideos(query, maxResults: 10);
-      if (!mounted) return;
-      setState(() {
-        _albumsSearchResult = [];
-        _playlistsSearchResult =
-            playlistResults.map((v) => videoToMap(v)).toList();
-      });
-    } catch (e) {
-      logger.log('Error loading albums/playlists: $e', null, null);
-    }
   }
 
   @override
@@ -532,6 +498,7 @@ class _SearchPageState extends State<SearchPage> {
                             key: ValueKey(playlist['ytid']),
                             playlist['title'],
                             playlistId: playlist['ytid'],
+                            playlistData: playlist, // Pass the full playlist data
                             playlistArtwork: playlist['image'],
                             cubeIcon: FluentIcons.cd_16_filled,
                             isAlbum: true,
@@ -556,6 +523,7 @@ class _SearchPageState extends State<SearchPage> {
                             key: ValueKey(playlist['ytid']),
                             playlist['title'],
                             playlistId: playlist['ytid'],
+                            playlistData: playlist, // Pass the full playlist data with songs
                             playlistArtwork: playlist['image'],
                             cubeIcon: FluentIcons.apps_list_24_filled,
                           );

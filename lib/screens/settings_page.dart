@@ -43,9 +43,16 @@ import 'package:j3tunes/widgets/confirmation_dialog.dart';
 import 'package:j3tunes/widgets/custom_bar.dart';
 import 'package:j3tunes/widgets/section_header.dart';
 
-class SettingsPage extends StatelessWidget {
+import 'package:j3tunes/widgets/user_profile_card.dart';
+
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
@@ -58,6 +65,14 @@ class SettingsPage extends StatelessWidget {
         padding: commonSingleChildScrollViewPadding,
         child: Column(
           children: <Widget>[
+            // User Profile Section at the top
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8.0),
+              child: UserProfileCard(
+                showGreeting: false,
+                isCompact: false,
+              ),
+            ),
             _buildPreferencesSection(
               context,
               primaryColor,
@@ -347,7 +362,6 @@ class SettingsPage extends StatelessWidget {
 
           return GestureDetector(
             onTap: () {
-      
               addOrUpdateData(
                 'settings',
                 'accentColor',

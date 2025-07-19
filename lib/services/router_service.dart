@@ -32,6 +32,7 @@ import 'package:j3tunes/screens/library_page.dart';
 import 'package:j3tunes/screens/search_page.dart';
 import 'package:j3tunes/screens/settings_page.dart';
 import 'package:j3tunes/screens/user_songs_page.dart';
+import 'package:j3tunes/screens/splash_screen.dart';
 import 'package:j3tunes/services/settings_manager.dart';
 
 class NavigationManager {
@@ -45,6 +46,15 @@ class NavigationManager {
 
   void _setupRouter() {
     final routes = [
+      // Splash Screen Route - First route
+      GoRoute(
+        path: '/splash',
+        pageBuilder: (context, state) {
+          return getPage(child: const SplashScreen(), state: state);
+        },
+      ),
+      
+      // Main App Routes
       StatefulShellRoute.indexedStack(
         parentNavigatorKey: parentNavigatorKey,
         branches: !offlineMode.value ? _onlineRoutes() : _offlineRoutes(),
@@ -59,11 +69,11 @@ class NavigationManager {
 
     router = GoRouter(
       navigatorKey: parentNavigatorKey,
-      initialLocation: homePath,
+      initialLocation: '/splash', // Start with splash screen
       routes: routes,
       restorationScopeId: 'router',
       debugLogDiagnostics: kDebugMode,
-      routerNeglect: true, // Not sure about this
+      routerNeglect: true,
     );
   }
 
@@ -92,6 +102,7 @@ class NavigationManager {
   GoRouteInformationParser get routeInformationParser =>
       router.routeInformationParser;
 
+  static const String splashPath = '/splash';
   static const String homePath = '/home';
   static const String settingsPath = '/settings';
   static const String searchPath = '/search';

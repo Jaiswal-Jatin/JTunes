@@ -1,9 +1,73 @@
-// ignore_for_file: directives_ordering
+import 'package:j3tunes/widgets/song_bar.dart';
+import 'package:j3tunes/widgets/spinner.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'dart:ui';
+import 'package:j3tunes/API/musify.dart';
+import 'package:audio_service/audio_service.dart';
+import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_flip_card/flutter_flip_card.dart';
+import 'package:j3tunes/extensions/l10n.dart';
+import 'package:palette_generator/palette_generator.dart';
+import 'package:j3tunes/main.dart';
+import 'package:j3tunes/models/position_data.dart';
+import 'package:j3tunes/services/settings_manager.dart';
+import 'package:j3tunes/utilities/common_variables.dart';
+import 'package:j3tunes/utilities/flutter_bottom_sheet.dart';
+import 'package:j3tunes/utilities/flutter_toast.dart';
+import 'package:j3tunes/utilities/formatter.dart';
+import 'package:j3tunes/utilities/mediaitem.dart';
+import 'package:j3tunes/utilities/utils.dart';
+import 'package:j3tunes/widgets/marque.dart';
+import 'package:j3tunes/widgets/playback_icon_button.dart';
+import 'package:j3tunes/widgets/song_artwork.dart';
+
+/// Call this function instead of Navigator.push to open NowPlayingPage with a smooth slide-up animation.
+void showNowPlayingPage(BuildContext context) {
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      transitionDuration: const Duration(milliseconds: 250), // Even faster
+      reverseTransitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (context, animation, secondaryAnimation) =>
+          const NowPlayingPage(),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        final slideAnimation = Tween<Offset>(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(
+          parent: animation,
+          curve: Curves.fastOutSlowIn,
+        ));
+
+        final fadeAnimation = Tween<double>(
+          begin: 0.0,
+          end: 1.0,
+        ).animate(CurvedAnimation(
+          parent: animation,
+          curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+        ));
+
+        return SlideTransition(
+          position: slideAnimation,
+          child: FadeTransition(
+            opacity: fadeAnimation,
+            child: child,
+          ),
+        );
+      },
+      opaque: false,
+      barrierColor: Colors.black.withOpacity(0.2),
+    ),
+  );
+}
+
+// ignore_for_file: directives_ordering, deprecated_member_use, use_decorated_box, prefer_const_declarations, unused_element
 
 /*
  *     Copyright (C) 2025 Valeri Gokadze
  *
- *     j3tunes is free software: you can redistribute it and/or modify
+ *     J3Tunes is free software: you can redistribute it and/or modify
  *     it under the terms of the GNU General Public License as published by
  *     the Free Software Foundation, either version 3 of the License, or
  *     (at your option) any later version.
@@ -21,30 +85,6 @@
  *     please visit: https://github.com/gokadzev/J3Tunes
  */
 
-import 'dart:ui';
-import 'package:j3tunes/API/musify.dart';
-import 'package:audio_service/audio_service.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_flip_card/flutter_flip_card.dart';
-import 'package:j3tunes/extensions/l10n.dart';
-import 'package:j3tunes/main.dart';
-import 'package:j3tunes/models/position_data.dart';
-import 'package:j3tunes/services/settings_manager.dart';
-import 'package:j3tunes/utilities/common_variables.dart';
-import 'package:j3tunes/utilities/flutter_bottom_sheet.dart';
-import 'package:j3tunes/utilities/flutter_toast.dart';
-import 'package:j3tunes/utilities/formatter.dart';
-import 'package:j3tunes/utilities/mediaitem.dart';
-import 'package:j3tunes/utilities/utils.dart';
-import 'package:j3tunes/widgets/marque.dart';
-import 'package:j3tunes/widgets/playback_icon_button.dart';
-import 'package:j3tunes/widgets/song_artwork.dart';
-import 'package:j3tunes/widgets/song_bar.dart';
-import 'package:j3tunes/widgets/spinner.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
-
 final _lyricsController = FlipCardController();
 
 // Global notifiers
@@ -54,6 +94,9 @@ final ValueNotifier<CardDisplayMode> cardModeNotifier =
 
 enum CardDisplayMode { artwork, lyrics, video }
 
+// Global cache for now playing colors
+final Map<String, Color> _nowPlayingColorCache = {};
+
 class NowPlayingPage extends StatefulWidget {
   const NowPlayingPage({super.key});
 
@@ -62,29 +105,99 @@ class NowPlayingPage extends StatefulWidget {
 }
 
 class _NowPlayingPageState extends State<NowPlayingPage> {
+  final ValueNotifier<Color?> _dominantColorNotifier =
+      ValueNotifier<Color?>(null);
+  String? _dominantColorImageUrl;
   YoutubePlayerController? _youtubeController;
   bool _isVideoInitialized = false;
   String? _currentVideoId;
   bool _isVideoMode = false;
 
   @override
-  void dispose() {
-    _youtubeController?.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    // No async work here, will be handled in didChangeDependencies
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Get current song immediately for instant color update
+    final currentMediaItem = audioHandler.mediaItem.valueOrNull;
+    if (currentMediaItem != null) {
+      final imageUrl = currentMediaItem.artUri?.toString();
+      if (imageUrl != null) {
+        _updateDominantColor(imageUrl);
+      }
+      final videoId = currentMediaItem.extras?['ytid'];
+      if (videoId != null) {
+        _initializeVideoPlayer(videoId);
+      }
+    }
+
+    // Listen to mediaItem changes for color and video init
+    audioHandler.mediaItem.listen((mediaItem) {
+      if (mediaItem != null) {
+        final imageUrl = mediaItem.artUri?.toString();
+        if (imageUrl != null && imageUrl != _dominantColorImageUrl) {
+          _updateDominantColor(imageUrl);
+        }
+        final videoId = mediaItem.extras?['ytid'];
+        if (videoId != null && videoId != _currentVideoId) {
+          _initializeVideoPlayer(videoId);
+        }
+      }
+    });
+  }
+
+  Future<void> _updateDominantColor(String imageUrl) async {
+    if (imageUrl == _dominantColorImageUrl) return;
+
+    // Check cache first
+    if (_nowPlayingColorCache.containsKey(imageUrl)) {
+      _dominantColorNotifier.value = _nowPlayingColorCache[imageUrl];
+      _dominantColorImageUrl = imageUrl;
+      return;
+    }
+
+    // Set a default color immediately for instant feedback
+    _dominantColorNotifier.value = Colors.black.withOpacity(0.85);
+    _dominantColorImageUrl = imageUrl;
+
+    try {
+      final PaletteGenerator palette = await PaletteGenerator.fromImageProvider(
+        NetworkImage(imageUrl),
+        size: const Size(80, 80), // Even smaller for faster processing
+        maximumColorCount: 6, // Reduced colors for faster processing
+      );
+
+      Color? color = palette.vibrantColor?.color ??
+          palette.dominantColor?.color ??
+          palette.darkVibrantColor?.color ??
+          Colors.black;
+
+      color = color.withOpacity(0.85);
+
+      // Cache the color
+      _nowPlayingColorCache[imageUrl] = color;
+      _dominantColorNotifier.value = color;
+    } catch (e) {
+      // Keep the default color if extraction fails
+      final defaultColor = Colors.black.withOpacity(0.85);
+      _nowPlayingColorCache[imageUrl] = defaultColor;
+      _dominantColorNotifier.value = defaultColor;
+    }
   }
 
   void _initializeVideoPlayer(String videoId) {
-    // Prevent multiple initializations for the same video
     if (_currentVideoId == videoId && _youtubeController != null) {
       return;
     }
 
-    // Always reset to audio mode when a new song is played
     _isVideoMode = false;
     isVideoModeNotifier.value = false;
     cardModeNotifier.value = CardDisplayMode.artwork;
 
-    // Use post frame callback to avoid setState during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         if (_youtubeController != null) {
@@ -94,7 +207,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
         _youtubeController = YoutubePlayerController(
           initialVideoId: videoId,
           flags: const YoutubePlayerFlags(
-            autoPlay: true, // Don't auto play initially
+            autoPlay: true,
             mute: false,
             enableCaption: true,
             captionLanguage: 'en',
@@ -102,11 +215,10 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
             hideControls: true,
             controlsVisibleAtStart: true,
             forceHD: false,
-            useHybridComposition: false, // Smoother video playback
+            useHybridComposition: false,
           ),
         );
 
-        // Listen to fullscreen changes
         _youtubeController!.addListener(() {
           if (_youtubeController!.value.isFullScreen) {
             SystemChrome.setPreferredOrientations([
@@ -135,7 +247,6 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
       setState(() {
         _isVideoMode = !_isVideoMode;
         isVideoModeNotifier.value = _isVideoMode;
-
         if (_isVideoMode) {
           // Switch to video mode
           cardModeNotifier.value = CardDisplayMode.video;
@@ -190,11 +301,6 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
         final metadata = snapshot.data!;
         final videoId = metadata.extras?['ytid'];
 
-        // Initialize video player when needed (but not during build)
-        if (videoId != null && videoId != _currentVideoId) {
-          _initializeVideoPlayer(videoId);
-        }
-
         // Create YoutubePlayer widget
         final youtubePlayer = _youtubeController != null && _isVideoInitialized
             ? YoutubePlayer(
@@ -209,9 +315,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                   print('YouTube player is ready');
                 },
                 onEnded: (metaData) {
-                  // Auto play next song when video ends
                   audioHandler.skipToNext();
-                  // Update video with new song
                   final newVideoId =
                       audioHandler.mediaItem.value?.extras?['ytid'];
                   if (newVideoId != null && _youtubeController != null) {
@@ -243,7 +347,6 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                   },
                 ),
                 actions: [
-                  // Audio/Video Toggle Button
                   if (videoId != null && _isVideoInitialized)
                     ValueListenableBuilder<bool>(
                       valueListenable: isVideoModeNotifier,
@@ -347,7 +450,12 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
               body: Stack(
                 children: [
                   // Spotify-like Background Effect
-                  _buildSpotifyBackground(context, metadata),
+                  ValueListenableBuilder<Color?>(
+                    valueListenable: _dominantColorNotifier,
+                    builder: (context, color, _) {
+                      return _buildSpotifyBackground(context, metadata, color);
+                    },
+                  ),
 
                   // Main Content
                   SafeArea(
@@ -381,72 +489,62 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     );
   }
 
-  Widget _buildSpotifyBackground(BuildContext context, MediaItem metadata) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          stops: const [0.0, 0.3, 0.7, 1.0],
-          colors: [
-            // Dynamic colors based on theme
-            Theme.of(context).colorScheme.primary.withOpacity(0.8),
-            Theme.of(context).colorScheme.primaryContainer.withOpacity(0.6),
-            Theme.of(context).colorScheme.surface.withOpacity(0.9),
-            Theme.of(context).colorScheme.surface,
-          ],
+  Widget _buildSpotifyBackground(
+      BuildContext context, MediaItem metadata, Color? dominantColor) {
+    return Stack(
+      children: [
+        // Solid color background first for instant display
+        Positioned.fill(
+          child: Container(
+            color: dominantColor ?? Colors.black.withOpacity(0.85),
+          ),
         ),
-      ),
-      child: Stack(
-        children: [
-          // Blurred Background Image
-          if (metadata.artUri != null)
-            Positioned.fill(
-              child: Image.network(
-                metadata.artUri.toString(),
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(),
-              ),
-            ),
 
-          // Blur Effect
+        // Image background with blur (loads after)
+        if (metadata.artUri != null)
+          Positioned.fill(
+            child: Image.network(
+              metadata.artUri.toString(),
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) {
+                  return child;
+                }
+                return Container(
+                    color: dominantColor ?? Colors.black.withOpacity(0.85));
+              },
+              errorBuilder: (context, error, stackTrace) => Container(
+                  color: dominantColor ?? Colors.black.withOpacity(0.85)),
+            ),
+          ),
+
+        if (metadata.artUri != null)
           Positioned.fill(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+              filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
               child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.3),
-                      Colors.black.withOpacity(0.7),
-                    ],
-                  ),
-                ),
+                color: Colors.black.withOpacity(0.25),
               ),
             ),
           ),
 
-          // Animated Gradient Overlay
-          Positioned.fill(
-            child: AnimatedContainer(
-              duration: const Duration(seconds: 2),
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment.topCenter,
-                  radius: 1.5,
-                  colors: [
-                    Theme.of(context).colorScheme.primary.withOpacity(0.4),
-                    Colors.transparent,
-                    Theme.of(context).colorScheme.secondary.withOpacity(0.2),
-                  ],
-                ),
+        // Gradient overlay
+        Positioned.fill(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  (dominantColor ?? Colors.black).withOpacity(0.8),
+                  Colors.black.withOpacity(0.9),
+                ],
+                stops: const [0.0, 1.0],
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -461,6 +559,7 @@ class _DesktopLayout extends StatelessWidget {
     required this.youtubePlayer,
     required this.isVideoMode,
   });
+
   final MediaItem metadata;
   final Size size;
   final double adjustedIconSize;
@@ -516,6 +615,7 @@ class _MobileLayout extends StatelessWidget {
     required this.youtubePlayer,
     required this.isVideoMode,
   });
+
   final MediaItem metadata;
   final Size size;
   final double adjustedIconSize;
@@ -570,6 +670,7 @@ class NowPlayingArtwork extends StatefulWidget {
     required this.youtubeController,
     required this.youtubePlayer,
   });
+
   final Size size;
   final MediaItem metadata;
   final YoutubePlayerController? youtubeController;
@@ -590,6 +691,7 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
     final imageSize = isLandscape
         ? screenHeight * 0.40
         : (screenWidth + screenHeight) / 3.35 - _padding;
+
     const lyricsTextStyle = TextStyle(
       fontSize: 24,
       fontWeight: FontWeight.w500,
@@ -627,8 +729,7 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
             child: ValueListenableBuilder<CardDisplayMode>(
               valueListenable: cardModeNotifier,
               builder: (context, mode, child) {
-                return _buildCardContent(
-                    imageSize, _radius, lyricsTextStyle, mode);
+                return _buildCardContent(imageSize, _radius, lyricsTextStyle, mode);
               },
             ),
           ),
@@ -657,7 +758,10 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
+                Theme.of(context)
+                    .colorScheme
+                    .primaryContainer
+                    .withOpacity(0.8),
                 Theme.of(context)
                     .colorScheme
                     .secondaryContainer
@@ -732,6 +836,7 @@ class QueueListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final _textColor = Colors.white.withOpacity(0.9);
+
     return Column(
       children: [
         Padding(
@@ -796,6 +901,7 @@ class MarqueeTextWidget extends StatelessWidget {
     required this.fontSize,
     required this.fontWeight,
   });
+
   final String text;
   final Color fontColor;
   final double fontSize;
@@ -836,6 +942,7 @@ class NowPlayingControls extends StatelessWidget {
     required this.youtubeController,
     required this.isVideoMode,
   });
+
   final BuildContext context;
   final Size size;
   final dynamic audioId;
@@ -932,10 +1039,8 @@ class _PositionSliderState extends State<PositionSlider> {
       builder: (context, value, child) {
         final position = value.position;
         final duration = value.metaData.duration;
-
         final maxDuration =
             duration.inSeconds > 0 ? duration.inSeconds.toDouble() : 1.0;
-
         final currentValue =
             _isDragging ? _dragValue : position.inSeconds.toDouble();
 
@@ -973,7 +1078,6 @@ class _PositionSliderState extends State<PositionSlider> {
         final maxDuration = positionData.duration.inSeconds > 0
             ? positionData.duration.inSeconds.toDouble()
             : 1.0;
-
         final currentValue = _isDragging
             ? _dragValue
             : positionData.position.inSeconds.toDouble();
@@ -1045,6 +1149,7 @@ class _PositionSliderState extends State<PositionSlider> {
   ) {
     final positionText = formatDuration(position.inSeconds);
     final durationText = formatDuration(duration.inSeconds);
+
     final textStyle = TextStyle(
       fontSize: 15,
       color: Colors.white.withOpacity(0.8),
@@ -1074,6 +1179,7 @@ class PlayerControlButtons extends StatelessWidget {
     this.youtubeController,
     this.isVideoMode = false,
   });
+
   final BuildContext context;
   final MediaItem metadata;
   final double iconSize;
@@ -1247,7 +1353,6 @@ class PlayerControlButtons extends StatelessWidget {
       valueListenable: repeatNotifier,
       builder: (_, repeatMode, __) {
         final isActive = repeatMode != AudioServiceRepeatMode.none;
-
         return Container(
           decoration: BoxDecoration(
             color: isActive
@@ -1293,6 +1398,7 @@ class BottomActionsRow extends StatelessWidget {
     required this.iconSize,
     required this.isLargeScreen,
   });
+
   final BuildContext context;
   final dynamic audioId;
   final MediaItem metadata;
@@ -1302,9 +1408,9 @@ class BottomActionsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final songLikeStatus = ValueNotifier<bool>(isSongAlreadyLiked(audioId));
-    final songOfflineStatus = ValueNotifier<bool>(
-      isSongAlreadyOffline(audioId),
-    );
+    final songOfflineStatus =
+        ValueNotifier<bool>(isSongAlreadyOffline(audioId));
+
     final _primaryColor = Colors.white;
 
     return Wrap(
@@ -1458,7 +1564,6 @@ class BottomActionsRow extends StatelessWidget {
       builder: (_, value, __) {
         final icon =
             value ? FluentIcons.heart_24_filled : FluentIcons.heart_24_regular;
-
         return Container(
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.1),
@@ -1484,6 +1589,7 @@ class BottomActionsRow extends StatelessWidget {
         final duration = sleepTimerNotifier.value ?? Duration.zero;
         var hours = duration.inMinutes ~/ 60;
         var minutes = duration.inMinutes % 60;
+
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(

@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use, omit_local_variable_types, unnecessary_lambdas, unawaited_futures
+
 import 'package:j3tunes/services/youtube_service.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:j3tunes/services/data_manager.dart';
@@ -5,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:j3tunes/extensions/l10n.dart';
 import 'package:j3tunes/main.dart';
 import 'package:j3tunes/screens/playlist_page.dart';
+import 'package:j3tunes/services/router_service.dart';
 import 'package:j3tunes/services/settings_manager.dart';
 import 'package:j3tunes/utilities/common_variables.dart';
 import 'package:j3tunes/utilities/utils.dart';
@@ -18,6 +21,7 @@ import 'package:j3tunes/widgets/user_profile_card.dart';
 bool isValidSong(Video song) {
   final duration = song.duration?.inSeconds ?? 0;
   if (duration < 120 || duration > 420) return false; // only 2-7 min
+
   final title = song.title.toLowerCase();
   final desc = song.description.toLowerCase();
 
@@ -59,6 +63,7 @@ bool isValidSong(Video song) {
   for (final word in nonSongKeywords) {
     if (title.contains(word) || desc.contains(word)) return false;
   }
+
   return true;
 }
 
@@ -104,7 +109,6 @@ class _HomePageState extends State<HomePage>
   Future<List<dynamic>>? _suggestedPlaylistsFuture;
   Future<List<dynamic>>? _languagePlaylistsFuture;
   Future<List<dynamic>>? _likedPlaylistsFuture;
-  Future<dynamic>? _topSongsFuture;
   Future<dynamic>? _trendingSongsFuture;
   Future<dynamic>? _popSongsFuture;
   Future<dynamic>? _rockSongsFuture;
@@ -113,7 +117,8 @@ class _HomePageState extends State<HomePage>
   Future<dynamic>? _marathiSongsFuture;
   Future<dynamic>? _teluguSongsFuture;
   Future<dynamic>? _tamilSongsFuture;
-  Future<List<dynamic>>? _albumsFuture;
+  Future<dynamic>? _kpopSongsFuture;
+  Future<dynamic>? _internationalSongsFuture;
 
   @override
   void initState() {
@@ -165,7 +170,7 @@ class _HomePageState extends State<HomePage>
     })).then((list) => list);
 
     // Language-wise playlists
-    Future.delayed(const Duration(milliseconds: 300), () async {
+    Future.delayed(const Duration(milliseconds: 200), () async {
       if (mounted) {
         final yt = YoutubeService();
         final languagePlaylists = <Map<String, dynamic>>[];
@@ -260,7 +265,7 @@ class _HomePageState extends State<HomePage>
     });
 
     // Liked playlists from local
-    Future.delayed(const Duration(milliseconds: 500), () async {
+    Future.delayed(const Duration(milliseconds: 300), () async {
       if (mounted) {
         final likedIds = await getLikedPlaylists();
         final yt = YoutubeService();
@@ -286,32 +291,15 @@ class _HomePageState extends State<HomePage>
       }
     });
 
-    // Top Songs - Ensure minimum 10 songs
-    Future.delayed(const Duration(milliseconds: 800), () async {
-      if (mounted) {
-        final yt = YoutubeService();
-        final topSongs = await yt.searchVideos('top songs', maxResults: 50);
-        print('HomePage: fetched topSongs count: ${topSongs.length}');
-        final filtered = topSongs.where(isValidSong).take(12).toList();
-        print('HomePage: filtered top songs count: ${filtered.length}');
-
-        setState(() {
-          _topSongsFuture =
-              Future.value(filtered.map((v) => videoToMap(v)).toList());
-        });
-      }
-    });
-
     // Trending songs - Ensure minimum 10 songs
-    Future.delayed(const Duration(milliseconds: 1200), () async {
+    Future.delayed(const Duration(milliseconds: 600), () async {
       if (mounted) {
         final yt = YoutubeService();
         final trendingSongs =
-            await yt.searchVideos('trending songs', maxResults: 50);
+            await yt.searchVideos('trending songs 2025', maxResults: 50);
         print('HomePage: fetched trendingSongs count: ${trendingSongs.length}');
         final filtered = trendingSongs.where(isValidSong).take(12).toList();
         print('HomePage: filtered trending songs count: ${filtered.length}');
-
         setState(() {
           _trendingSongsFuture =
               Future.value(filtered.map((v) => videoToMap(v)).toList());
@@ -319,8 +307,45 @@ class _HomePageState extends State<HomePage>
       }
     });
 
+    // K-Pop Songs - NEW CATEGORY
+    Future.delayed(const Duration(milliseconds: 800), () async {
+      if (mounted) {
+        final yt = YoutubeService();
+        final kpopSongs = await yt.searchVideos(
+            'kpop songs 2025 BTS Blackpink NewJeans',
+            maxResults: 50);
+        print('HomePage: fetched kpopSongs count: ${kpopSongs.length}');
+        final filtered = kpopSongs.where(isValidSong).take(12).toList();
+        print('HomePage: filtered kpop songs count: ${filtered.length}');
+        setState(() {
+          _kpopSongsFuture =
+              Future.value(filtered.map((v) => videoToMap(v)).toList());
+        });
+      }
+    });
+
+    // International Top Songs - NEW CATEGORY
+    Future.delayed(const Duration(milliseconds: 1000), () async {
+      if (mounted) {
+        final yt = YoutubeService();
+        final internationalSongs = await yt.searchVideos(
+            'international top songs 2025 english hits',
+            maxResults: 50);
+        print(
+            'HomePage: fetched internationalSongs count: ${internationalSongs.length}');
+        final filtered =
+            internationalSongs.where(isValidSong).take(12).toList();
+        print(
+            'HomePage: filtered international songs count: ${filtered.length}');
+        setState(() {
+          _internationalSongsFuture =
+              Future.value(filtered.map((v) => videoToMap(v)).toList());
+        });
+      }
+    });
+
     // Pop Songs - Ensure minimum 10 songs
-    Future.delayed(const Duration(milliseconds: 1600), () async {
+    Future.delayed(const Duration(milliseconds: 1200), () async {
       if (mounted) {
         final yt = YoutubeService();
         final popSongs =
@@ -328,7 +353,6 @@ class _HomePageState extends State<HomePage>
         print('HomePage: fetched popSongs count: ${popSongs.length}');
         final filtered = popSongs.where(isValidSong).take(12).toList();
         print('HomePage: filtered pop songs count: ${filtered.length}');
-
         setState(() {
           _popSongsFuture =
               Future.value(filtered.map((v) => videoToMap(v)).toList());
@@ -337,7 +361,7 @@ class _HomePageState extends State<HomePage>
     });
 
     // Rock Songs - Ensure minimum 10 songs
-    Future.delayed(const Duration(milliseconds: 2000), () async {
+    Future.delayed(const Duration(milliseconds: 1400), () async {
       if (mounted) {
         final yt = YoutubeService();
         final rockSongs =
@@ -345,7 +369,6 @@ class _HomePageState extends State<HomePage>
         print('HomePage: fetched rockSongs count: ${rockSongs.length}');
         final filtered = rockSongs.where(isValidSong).take(12).toList();
         print('HomePage: filtered rock songs count: ${filtered.length}');
-
         setState(() {
           _rockSongsFuture =
               Future.value(filtered.map((v) => videoToMap(v)).toList());
@@ -354,7 +377,7 @@ class _HomePageState extends State<HomePage>
     });
 
     // Bollywood Songs - Ensure minimum 10 songs
-    Future.delayed(const Duration(milliseconds: 2400), () async {
+    Future.delayed(const Duration(milliseconds: 1600), () async {
       if (mounted) {
         final yt = YoutubeService();
         final bollywoodSongs =
@@ -363,7 +386,6 @@ class _HomePageState extends State<HomePage>
             'HomePage: fetched bollywoodSongs count: ${bollywoodSongs.length}');
         final filtered = bollywoodSongs.where(isValidSong).take(12).toList();
         print('HomePage: filtered bollywood songs count: ${filtered.length}');
-
         setState(() {
           _bollywoodSongsFuture =
               Future.value(filtered.map((v) => videoToMap(v)).toList());
@@ -372,7 +394,7 @@ class _HomePageState extends State<HomePage>
     });
 
     // Punjabi Songs - Ensure minimum 10 songs
-    Future.delayed(const Duration(milliseconds: 2800), () async {
+    Future.delayed(const Duration(milliseconds: 1800), () async {
       if (mounted) {
         final yt = YoutubeService();
         final punjabSongs =
@@ -380,7 +402,6 @@ class _HomePageState extends State<HomePage>
         print('HomePage: fetched punjabSongs count: ${punjabSongs.length}');
         final filtered = punjabSongs.where(isValidSong).take(12).toList();
         print('HomePage: filtered punjab songs count: ${filtered.length}');
-
         setState(() {
           _punjabSongsFuture =
               Future.value(filtered.map((v) => videoToMap(v)).toList());
@@ -389,7 +410,7 @@ class _HomePageState extends State<HomePage>
     });
 
     // Marathi Songs - Ensure minimum 10 songs
-    Future.delayed(const Duration(milliseconds: 3200), () async {
+    Future.delayed(const Duration(milliseconds: 2000), () async {
       if (mounted) {
         final yt = YoutubeService();
         final marathiSongs =
@@ -397,7 +418,6 @@ class _HomePageState extends State<HomePage>
         print('HomePage: fetched marathiSongs count: ${marathiSongs.length}');
         final filtered = marathiSongs.where(isValidSong).take(12).toList();
         print('HomePage: filtered marathi songs count: ${filtered.length}');
-
         setState(() {
           _marathiSongsFuture =
               Future.value(filtered.map((v) => videoToMap(v)).toList());
@@ -406,7 +426,7 @@ class _HomePageState extends State<HomePage>
     });
 
     // Telugu Songs - Ensure minimum 10 songs
-    Future.delayed(const Duration(milliseconds: 3600), () async {
+    Future.delayed(const Duration(milliseconds: 2200), () async {
       if (mounted) {
         final yt = YoutubeService();
         final teluguSongs =
@@ -414,7 +434,6 @@ class _HomePageState extends State<HomePage>
         print('HomePage: fetched teluguSongs count: ${teluguSongs.length}');
         final filtered = teluguSongs.where(isValidSong).take(12).toList();
         print('HomePage: filtered telugu songs count: ${filtered.length}');
-
         setState(() {
           _teluguSongsFuture =
               Future.value(filtered.map((v) => videoToMap(v)).toList());
@@ -423,7 +442,7 @@ class _HomePageState extends State<HomePage>
     });
 
     // Tamil Songs - Ensure minimum 10 songs
-    Future.delayed(const Duration(milliseconds: 4000), () async {
+    Future.delayed(const Duration(milliseconds: 2400), () async {
       if (mounted) {
         final yt = YoutubeService();
         final tamilSongs =
@@ -431,57 +450,23 @@ class _HomePageState extends State<HomePage>
         print('HomePage: fetched tamilSongs count: ${tamilSongs.length}');
         final filtered = tamilSongs.where(isValidSong).take(12).toList();
         print('HomePage: filtered tamil songs count: ${filtered.length}');
-
         setState(() {
           _tamilSongsFuture =
               Future.value(filtered.map((v) => videoToMap(v)).toList());
         });
       }
     });
+  }
 
-    // Albums
-    Future.delayed(const Duration(seconds: 5), () async {
-      if (mounted) {
-        final yt = YoutubeService();
-        _albumsFuture = yt
-            .searchPlaylists('album playlist',
-                maxResults: recommendedCubesNumber * 2)
-            .then((albums) async {
-          print('HomePage: fetched albums playlists count: ${albums.length}');
-          if (albums.isNotEmpty) {
-            return albums.take(recommendedCubesNumber).map((p) {
-              String image = p.thumbnails.highResUrl.isNotEmpty
-                  ? p.thumbnails.highResUrl
-                  : p.thumbnails.standardResUrl.isNotEmpty
-                      ? p.thumbnails.standardResUrl
-                      : p.thumbnails.mediumResUrl.isNotEmpty
-                          ? p.thumbnails.mediumResUrl
-                          : p.thumbnails.lowResUrl;
-
-              if (image.isEmpty) {
-                image = 'assets/images/JTunes.png';
-              }
-
-              return {
-                'ytid': p.id,
-                'title': p.title,
-                'image': image,
-                'playlist': p,
-              };
-            }).toList();
-          } else {
-            // Fallback: show top albums videos as "albums"
-            final videos = await yt.searchVideos('top albums',
-                maxResults: recommendedCubesNumber * 2);
-            print('HomePage: fallback videos for albums: ${videos.length}');
-            return videos
-                .take(recommendedCubesNumber)
-                .map((v) => videoToMap(v))
-                .toList();
-          }
-        });
-      }
-    });
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Good morning';
+    } else if (hour < 17) {
+      return 'Good afternoon';
+    } else {
+      return 'Good evening';
+    }
   }
 
   @override
@@ -490,144 +475,285 @@ class _HomePageState extends State<HomePage>
     final playlistHeight = MediaQuery.sizeOf(context).height * 0.25 / 1.1;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('JTunes'),
-        elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      ),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _refreshContent,
+          color: Theme.of(context).colorScheme.primary,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 8,
-              bottom: 120, // Increased for mini player
-            ),
             physics: const BouncingScrollPhysics(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // User profile - always show first
-                const RepaintBoundary(
-                  child: UserProfileCard(showGreeting: true),
-                ),
-                const SizedBox(height: 16),
+                // Header like YouTube Music/Spotify
+                _buildHeader(),
 
-                // 1. Suggested Playlists section (horizontal scroll)
+                // Playlist Section (old suggested playlists section)
                 RepaintBoundary(
                   child: _buildSuggestedPlaylists(playlistHeight),
                 ),
 
-                // 2. Language Playlists section (horizontal scroll)
-                if (_languagePlaylistsFuture != null) ...[
-                  RepaintBoundary(
-                    child: _buildLanguagePlaylists(playlistHeight),
-                  ),
-                ],
-
-                // 3. Top Songs section (horizontal scroll)
-                if (_topSongsFuture != null) ...[
-                  RepaintBoundary(
-                    child: _buildHorizontalSongsSection(
-                      '🔥 Top Songs',
-                      _topSongsFuture!,
-                      'top_song',
-                    ),
-                  ),
-                ],
-
-                // 4. Trending Songs section (horizontal scroll)
+                // Trending
                 if (_trendingSongsFuture != null) ...[
                   RepaintBoundary(
-                    child: _buildHorizontalSongsSection(
-                      '📈 Trending Songs',
+                    child: _buildHorizontalSongsSectionWithSeeAll(
+                      'Trending',
                       _trendingSongsFuture!,
                       'trending_song',
                     ),
                   ),
                 ],
 
-                // 5. Pop Songs section (horizontal scroll)
-                if (_popSongsFuture != null) ...[
-                  RepaintBoundary(
-                    child: _buildHorizontalSongsSection(
-                      '🎤 Pop Songs',
-                      _popSongsFuture!,
-                      'pop_song',
-                    ),
-                  ),
-                ],
+                // // International
+                // if (_internationalSongsFuture != null) ...[
+                //   RepaintBoundary(
+                //     child: _buildHorizontalSongsSectionWithSeeAll(
+                //       'International',
+                //       _internationalSongsFuture!,
+                //       'international_song',
+                //     ),
+                //   ),
+                // ],
 
-                // 6. Rock Songs section (horizontal scroll)
-                if (_rockSongsFuture != null) ...[
-                  RepaintBoundary(
-                    child: _buildHorizontalSongsSection(
-                      '🎸 Rock Songs',
-                      _rockSongsFuture!,
-                      'rock_song',
-                    ),
-                  ),
-                ],
-
-                // 7. Bollywood Songs section (horizontal scroll)
+                // Bollywood
                 if (_bollywoodSongsFuture != null) ...[
                   RepaintBoundary(
-                    child: _buildHorizontalSongsSection(
-                      '🎬 Bollywood Songs',
+                    child: _buildHorizontalSongsSectionWithSeeAll(
+                      'Bollywood',
                       _bollywoodSongsFuture!,
                       'bollywood_song',
                     ),
                   ),
                 ],
 
-                // 8. Punjabi Songs section (horizontal scroll)
+                // Punjabi
                 if (_punjabSongsFuture != null) ...[
                   RepaintBoundary(
-                    child: _buildHorizontalSongsSection(
-                      '🎵 Punjabi Songs',
+                    child: _buildHorizontalSongsSectionWithSeeAll(
+                      'Punjabi',
                       _punjabSongsFuture!,
                       'punjabi_song',
                     ),
                   ),
                 ],
 
-                // 9. Marathi Songs section (horizontal scroll)
+                // Marathi
                 if (_marathiSongsFuture != null) ...[
                   RepaintBoundary(
-                    child: _buildHorizontalSongsSection(
-                      '🎶 Marathi Songs',
+                    child: _buildHorizontalSongsSectionWithSeeAll(
+                      'Marathi',
                       _marathiSongsFuture!,
                       'marathi_song',
                     ),
                   ),
                 ],
 
-                // 10. Telugu Songs section (horizontal scroll)
+                // Telugu
                 if (_teluguSongsFuture != null) ...[
                   RepaintBoundary(
-                    child: _buildHorizontalSongsSection(
-                      '🎭 Telugu Songs',
+                    child: _buildHorizontalSongsSectionWithSeeAll(
+                      'Telugu',
                       _teluguSongsFuture!,
                       'telugu_song',
                     ),
                   ),
                 ],
 
-                // 11. Tamil Songs section (horizontal scroll)
+                // Tamil
                 if (_tamilSongsFuture != null) ...[
                   RepaintBoundary(
-                    child: _buildHorizontalSongsSection(
-                      '🎨 Tamil Songs',
+                    child: _buildHorizontalSongsSectionWithSeeAll(
+                      'Tamil',
                       _tamilSongsFuture!,
                       'tamil_song',
                     ),
                   ),
                 ],
+
+                // K-Pop
+                if (_kpopSongsFuture != null) ...[
+                  RepaintBoundary(
+                    child: _buildHorizontalSongsSectionWithSeeAll(
+                      'K-Pop hits',
+                      _kpopSongsFuture!,
+                      'kpop_song',
+                    ),
+                  ),
+                ],
+
+                // Pop
+                if (_popSongsFuture != null) ...[
+                  RepaintBoundary(
+                    child: _buildHorizontalSongsSectionWithSeeAll(
+                      'Pop music',
+                      _popSongsFuture!,
+                      'pop_song',
+                    ),
+                  ),
+                ],
+
+                // Rock
+                if (_rockSongsFuture != null) ...[
+                  RepaintBoundary(
+                    child: _buildHorizontalSongsSectionWithSeeAll(
+                      'Rock',
+                      _rockSongsFuture!,
+                      'rock_song',
+                    ),
+                  ),
+                ],
+
+                // Language Playlists at bottom
+                if (_languagePlaylistsFuture != null) ...[
+                  RepaintBoundary(
+                    child: _buildLanguagePlaylists(playlistHeight),
+                  ),
+                ],
+
+                // Bottom padding for mini player
+                const SizedBox(height: 120),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Greeting like Spotify
+          Text(
+            _getGreeting(),
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Quick access buttons like Spotify
+          Row(
+            children: [
+              Expanded(
+                child: _buildQuickAccessButton(
+                  'Liked Songs',
+                  Icons.favorite,
+                  () {
+                    // Push Liked Songs as a new route so back returns to Home
+                    NavigationManager.router.push('/library/userSongs/liked');
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildQuickAccessButton(
+                  'Downloaded',
+                  Icons.download,
+                  () {
+                    NavigationManager.router.push('/library/userSongs/offline');
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildQuickAccessButton(
+                  'Recently played',
+                  Icons.history,
+                  () {
+                    NavigationManager.router.push('/library/userSongs/recents');
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildQuickAccessButton(
+                  'Made for you',
+                  Icons.auto_awesome,
+                  () async {
+                    // Open a playlist page with 50 trending songs
+                    if (_trendingSongsFuture != null) {
+                      final snapshot = await _trendingSongsFuture;
+                      if (snapshot is List && snapshot.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PlaylistPage(
+                              playlistData: {
+                                'title': 'Made for You',
+                                'list': snapshot.take(50).toList(),
+                                'image': snapshot[0]['image'] ??
+                                    'assets/images/JTunes.png',
+                                'source': 'trending',
+                              },
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickAccessButton(
+      String title, IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(4),
+                  bottomLeft: Radius.circular(4),
+                ),
+              ),
+              child: Icon(
+                icon,
+                color: Theme.of(context).colorScheme.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -638,8 +764,9 @@ class _HomePageState extends State<HomePage>
       _suggestedPlaylistsFuture = null;
       _languagePlaylistsFuture = null;
       _likedPlaylistsFuture = null;
-      _topSongsFuture = null;
       _trendingSongsFuture = null;
+      _kpopSongsFuture = null;
+      _internationalSongsFuture = null;
       _popSongsFuture = null;
       _rockSongsFuture = null;
       _bollywoodSongsFuture = null;
@@ -647,30 +774,16 @@ class _HomePageState extends State<HomePage>
       _marathiSongsFuture = null;
       _teluguSongsFuture = null;
       _tamilSongsFuture = null;
-      _albumsFuture = null;
     });
-
     await Future.delayed(const Duration(milliseconds: 300));
     _initializeFutures();
   }
 
   Widget _buildLoadingWidget() {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(35),
+    return Container(
+      height: 60,
+      child: const Center(
         child: Spinner(),
-      ),
-    );
-  }
-
-  Widget _buildErrorWidget(BuildContext context) {
-    return Center(
-      child: Text(
-        '${context.l10n!.error}!',
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.primary,
-          fontSize: 18,
-        ),
       ),
     );
   }
@@ -686,8 +799,8 @@ class _HomePageState extends State<HomePage>
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Column(
             children: [
-              SectionHeader(title: '🌍 Language Playlists', fontSize: 18),
-              const SizedBox(height: 60, child: Center(child: Spinner())),
+              _buildSectionHeader('More of what you like'),
+              _buildLoadingWidget(),
             ],
           );
         } else if (snapshot.hasError) {
@@ -710,21 +823,19 @@ class _HomePageState extends State<HomePage>
 
         return Column(
           children: [
-            SectionHeader(
-              title: '🌍 Language Playlists',
-              fontSize: 18,
-            ),
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: playlistHeight),
+            _buildSectionHeader('More of what you like'),
+            Container(
+              height: playlistHeight,
+              margin: const EdgeInsets.only(bottom: 32),
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 itemCount: itemsNumber,
                 itemBuilder: (context, index) {
                   final playlist = playlists[index] as Map<String, dynamic>;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  return Container(
+                    margin: const EdgeInsets.only(right: 12),
                     child: GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -737,20 +848,44 @@ class _HomePageState extends State<HomePage>
                           ),
                         );
                       },
-                      child: PlaylistCube(playlist, size: playlistHeight),
+                      child: _buildPlaylistCard(playlist, playlistHeight),
                     ),
                   );
                 },
               ),
             ),
-            const SizedBox(height: 24),
           ],
         );
       },
     );
   }
 
-  Widget _buildHorizontalSongsSection(
+  Widget _buildSectionHeader(String title, {VoidCallback? onSeeAll}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          20, 16, 20, 4), // More top padding, minimal bottom
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          if (onSeeAll != null)
+            TextButton(
+              onPressed: onSeeAll,
+              child: const Text('See All'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHorizontalSongsSectionWithSeeAll(
     String title,
     Future<dynamic> future,
     String keyPrefix,
@@ -761,17 +896,14 @@ class _HomePageState extends State<HomePage>
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Column(
             children: [
-              SectionHeader(title: title, fontSize: 18),
-              const SizedBox(height: 60, child: Center(child: Spinner())),
-              const SizedBox(height: 24),
+              _buildSectionHeader(title, onSeeAll: null),
+              _buildLoadingWidget(),
             ],
           );
         }
-
         if (snapshot.connectionState != ConnectionState.done) {
           return const SizedBox.shrink();
         }
-
         if (snapshot.hasError) {
           logger.log(
             'Error in _buildHorizontalSongsSection for $title',
@@ -780,14 +912,11 @@ class _HomePageState extends State<HomePage>
           );
           return const SizedBox.shrink();
         }
-
         if (!snapshot.hasData) {
           return const SizedBox.shrink();
         }
-
         final data = snapshot.data as List<dynamic>;
         if (data.isEmpty) return const SizedBox.shrink();
-
         // Patch: ensure every song has 'lowResImage' for SongBar
         final patchedData = data.map((item) {
           if (item is Map<String, dynamic>) {
@@ -799,22 +928,46 @@ class _HomePageState extends State<HomePage>
           }
           return item;
         }).toList();
-
+        // Show at least 20, up to 30 songs if available
+        final int minSongs = 20;
+        final int maxSongs = 30;
+        final int showCount = patchedData.length < minSongs
+            ? patchedData.length
+            : (patchedData.length > maxSongs ? maxSongs : patchedData.length);
         return Column(
           children: [
-            SectionHeader(title: title, fontSize: 18),
+            _buildSectionHeader(title, onSeeAll: () {
+              // See All: open PlaylistPage with all songs (20-30)
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PlaylistPage(
+                    playlistData: {
+                      'title': title,
+                      'list': patchedData.take(maxSongs).toList(),
+                      'image': patchedData.isNotEmpty
+                          ? patchedData[0]['image'] ??
+                              'assets/images/JTunes.png'
+                          : 'assets/images/JTunes.png',
+                      'source': 'auto',
+                    },
+                  ),
+                ),
+              );
+            }),
             Container(
-              height: 190, // Fixed height to prevent overflow
-              margin: const EdgeInsets.only(bottom: 24),
+              height: 180,
+              margin:
+                  const EdgeInsets.only(bottom: 8), // Minimized bottom margin
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: patchedData.length,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8), // Minimized horizontal padding
+                itemCount: showCount,
                 itemBuilder: (context, index) {
                   final item = patchedData[index] as Map<String, dynamic>;
                   final ytid = item['ytid'];
-
                   // Ensure image extraction is robust
                   final songWithImage = Map<String, dynamic>.from(item);
                   String? img = songWithImage['artUri'] ??
@@ -823,13 +976,13 @@ class _HomePageState extends State<HomePage>
                   if (img == null || img.isEmpty)
                     img = 'assets/images/JTunes.png';
                   songWithImage['lowResImage'] = img;
-
                   return Container(
-                    width: 150, // Slightly wider cards
-                    margin: const EdgeInsets.only(right: 12),
+                    width: 140,
+                    margin: const EdgeInsets.only(
+                        right: 6), // Minimized gap between cards
                     child: RepaintBoundary(
                       key: ValueKey('${keyPrefix}_$ytid'),
-                      child: _buildVerticalSongCard(songWithImage),
+                      child: _buildSongCard(songWithImage),
                     ),
                   );
                 },
@@ -841,137 +994,76 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildVerticalSongCard(Map<String, dynamic> song) {
+  Widget _buildSongCard(Map<String, dynamic> song) {
     return GestureDetector(
       onTap: () {
         // Play the song
         audioHandler.playSong(song);
       },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Song Image - Bigger and at top
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                  ),
+      child: SizedBox(
+        width: 140,
+        child: IntrinsicHeight(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: Theme.of(context).colorScheme.surface,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
                   child: Image.network(
                     song['lowResImage'] ?? song['image'] ?? '',
-                    width: double.infinity,
-                    height: 110, // Bigger image height
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
-                        width: double.infinity,
-                        height: 110,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withOpacity(0.2),
-                              Theme.of(context)
-                                  .colorScheme
-                                  .secondary
-                                  .withOpacity(0.1),
-                            ],
-                          ),
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(16),
-                            topRight: Radius.circular(16),
-                          ),
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
                           Icons.music_note,
                           color: Theme.of(context).colorScheme.primary,
-                          size: 45,
+                          size: 40,
                         ),
                       );
                     },
                   ),
                 ),
-                // Play Button Overlay
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.3),
-                          blurRadius: 6,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.play_arrow,
-                      color: Colors.white,
-                      size: 18,
-                    ),
+              ),
+              const SizedBox(height: 4), // Reduced top gap
+              Flexible(
+                child: Text(
+                  song['title'] ?? 'Unknown Title',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
-                ),
-              ],
-            ),
-            // Song Details - Below image
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      song['title'] ?? 'Unknown Title',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onSurface,
-                        height: 1.2,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      song['artist'] ?? 'Unknown Artist',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withOpacity(0.7),
-                        height: 1.1,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 2), // Reduced bottom gap
+              Flexible(
+                child: Text(
+                  song['artist'] ?? 'Unknown Artist',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.7),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -981,42 +1073,31 @@ class _HomePageState extends State<HomePage>
     double playlistHeight, {
     bool showOnlyLiked = false,
   }) {
-    final sectionTitle = showOnlyLiked
-        ? context.l10n!.backToFavorites
-        : context.l10n!.suggestedPlaylists;
+    final sectionTitle =
+        showOnlyLiked ? context.l10n!.backToFavorites : 'Made for you';
     final adjustedHeight =
         showOnlyLiked ? playlistHeight * 0.6 : playlistHeight;
     final future =
         showOnlyLiked ? _likedPlaylistsFuture : _suggestedPlaylistsFuture;
 
     if (future == null) {
-      return showOnlyLiked ? const SizedBox.shrink() : _buildLoadingWidget();
+      return const SizedBox.shrink();
     }
 
     return FutureBuilder<List<dynamic>>(
       future: future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingWidget();
+          return const SizedBox.shrink();
         } else if (snapshot.hasError) {
           logger.log(
             'Error in _buildSuggestedPlaylists',
             snapshot.error,
             snapshot.stackTrace,
           );
-          return _buildErrorWidget(context);
+          return const SizedBox.shrink();
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.all(32.0),
-            child: Center(
-              child: Text(
-                '',
-                style: TextStyle(
-                    fontSize: 16, color: Theme.of(context).colorScheme.primary),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          );
+          return const SizedBox.shrink();
         }
 
         // Only show playlists that have at least one song
@@ -1029,139 +1110,101 @@ class _HomePageState extends State<HomePage>
             .toList();
 
         final itemsNumber = playlists.length.clamp(0, recommendedCubesNumber);
-        final isLargeScreen = MediaQuery.of(context).size.width > 480;
 
         if (playlists.isEmpty) {
           return const SizedBox.shrink();
         }
 
+        // Use old scroll effect: Always show scroll even if less items
         return Column(
           children: [
-            SectionHeader(
-              title: sectionTitle,
-              fontSize: 18,
+            _buildSectionHeader(sectionTitle),
+            SizedBox(
+              height: adjustedHeight,
+              child: ClipRect(
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  itemCount: itemsNumber,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(width: 6),
+                  itemBuilder: (context, index) {
+                    final playlist = playlists[index] as Map<String, dynamic>;
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PlaylistPage(
+                              playlistId: playlist['ytid'],
+                              playlistData: playlist,
+                            ),
+                          ),
+                        );
+                      },
+                      child: _buildPlaylistCard(playlist, adjustedHeight),
+                    );
+                  },
+                ),
+              ),
             ),
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: adjustedHeight),
-              child: isLargeScreen
-                  ? _buildHorizontalList(
-                      playlists,
-                      itemsNumber,
-                      adjustedHeight,
-                      showOnlyLiked: showOnlyLiked,
-                    )
-                  : _buildCarouselView(
-                      playlists,
-                      itemsNumber,
-                      adjustedHeight,
-                      showOnlyLiked: showOnlyLiked,
-                    ),
-            ),
-            const SizedBox(height: 24),
           ],
         );
       },
     );
   }
 
-  Widget _buildHorizontalList(
-    List<dynamic> playlists,
-    int itemCount,
-    double height, {
-    bool showOnlyLiked = false,
-  }) {
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.symmetric(
-        horizontal: showOnlyLiked ? 12 : 8,
-      ),
-      itemCount: itemCount,
-      itemBuilder: (context, index) {
-        final playlist = playlists[index] as Map<String, dynamic>;
-        // Debug print for playlist image
-        print(
-            '[HomePage] Playlist: ${playlist['title']} | image: ${playlist['image']}');
-        return Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: showOnlyLiked ? 4 : 8,
-          ),
-          child: GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => PlaylistPage(
-                    playlistId: playlist['ytid'],
-                    playlistData: playlist,
-                  ),
-                ),
-              );
-            },
-            child: PlaylistCube(playlist, size: height),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCarouselView(
-    List<dynamic> playlists,
-    int itemCount,
-    double height, {
-    bool showOnlyLiked = false,
-  }) {
-    if (showOnlyLiked) {
-      return ListView.builder(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: itemCount,
-        itemBuilder: (context, index) {
-          final playlist = playlists[index] as Map<String, dynamic>;
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => PlaylistPage(
-                      playlistId: playlist['ytid'],
-                      playlistData: playlist,
+  Widget _buildPlaylistCard(Map<String, dynamic> playlist, double size) {
+    return SizedBox(
+      width: size,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              image: playlist['image'] != null &&
+                      playlist['image'].toString().isNotEmpty
+                  ? DecorationImage(
+                      image: NetworkImage(playlist['image']),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: (playlist['image'] == null || playlist['image'].isEmpty)
+                ? Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                  ),
-                );
-              },
-              child: PlaylistCube(playlist, size: height),
-            ),
-          );
-        },
-      );
-    }
-
-    return CarouselView.weighted(
-      flexWeights: const <int>[3, 2, 1],
-      itemSnapping: true,
-      onTap: (index) {
-        final playlist = playlists[index] as Map<String, dynamic>;
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PlaylistPage(
-              playlistId: playlist['ytid'],
-              playlistData: playlist,
+                    child: Icon(
+                      Icons.music_note,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 40,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: size,
+            height: 36,
+            child: Text(
+              playlist['title'] ?? 'Unknown Playlist',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-        );
-      },
-      children: List.generate(itemCount, (index) {
-        final playlist = playlists[index] as Map<String, dynamic>;
-        // Debug print for playlist image (carousel)
-        print(
-            '[HomePage] Playlist (carousel): ${playlist['title']} | image: ${playlist['image']}');
-        return PlaylistCube(playlist, size: height * 2);
-      }),
+        ],
+      ),
     );
   }
 }

@@ -1,4 +1,4 @@
-// ignore_for_file: directives_ordering
+// ignore_for_file: directives_ordering, unused_field, prefer_final_fields
 
 /*
  *     Copyright (C) 2025 Valeri Gokadze
