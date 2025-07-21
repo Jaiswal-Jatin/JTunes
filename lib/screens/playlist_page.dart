@@ -352,8 +352,22 @@ class _PlaylistPageState extends State<PlaylistPage> {
   Widget _buildPlaylistImage() {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isLandscape = screenWidth > MediaQuery.sizeOf(context).height;
+    // Use first song's image if available
+    String? playlistImage = _playlist['image'];
+    if (_playlist['list'] != null &&
+        _playlist['list'] is List &&
+        _playlist['list'].isNotEmpty) {
+      final firstSong = _playlist['list'][0];
+      playlistImage = firstSong['artUri'] ??
+          firstSong['image'] ??
+          firstSong['highResImage'] ??
+          firstSong['lowResImage'] ??
+          playlistImage;
+    }
+    final playlistForCube = Map<String, dynamic>.from(_playlist);
+    playlistForCube['image'] = playlistImage;
     return PlaylistCube(
-      _playlist,
+      playlistForCube,
       size: isLandscape ? 300 : screenWidth / 2.5,
       cubeIcon: widget.cubeIcon,
     );

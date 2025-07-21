@@ -194,18 +194,31 @@ class _SongBarState extends State<SongBar> {
                 ? _lowResImageUrl
                 : null;
 
+    Widget imageWidget;
     if (_artworkPath != null && _artworkPath!.isNotEmpty) {
-      return SizedBox(
+      imageWidget = Image.file(
+        File(_artworkPath!),
+        fit: BoxFit.cover,
+      );
+    } else if (imageUrl != null && imageUrl.isNotEmpty) {
+      imageWidget = CachedNetworkImage(
+        key: ValueKey(imageUrl),
         width: size,
         height: size,
-        child: ClipRRect(
-          borderRadius: commonBarRadius,
-          child: Image.file(
-            File(_artworkPath!),
-            fit: BoxFit.cover,
-          ),
+        imageUrl: imageUrl,
+        memCacheWidth: (size * 3).toInt(),
+        memCacheHeight: (size * 3).toInt(),
+        filterQuality: FilterQuality.high,
+        imageBuilder: (context, imageProvider) => Image(
+          image: imageProvider,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.high,
         ),
+        errorWidget: (context, url, error) =>
+            const NullArtworkWidget(iconSize: 30),
       );
+    } else {
+      imageWidget = const NullArtworkWidget(iconSize: 30);
     }
 
     return SizedBox(
@@ -213,27 +226,15 @@ class _SongBarState extends State<SongBar> {
       height: size,
       child: ClipRRect(
         borderRadius: commonBarRadius,
-        child: Stack(
-          alignment: Alignment.center,
+        child: Transform.scale(
+          scale: 1.4, // Crop/zoom all song bar images everywhere
+          child: Stack(
+            alignment: Alignment.center,
           children: <Widget>[
-            imageUrl != null && imageUrl.isNotEmpty
-                ? CachedNetworkImage(
-                    key: ValueKey(imageUrl),
-                    width: size,
-                    height: size,
-                    imageUrl: imageUrl,
-                    memCacheWidth: (size * 3).toInt(),
-                    memCacheHeight: (size * 3).toInt(),
-                    filterQuality: FilterQuality.high,
-                    imageBuilder: (context, imageProvider) => Image(
-                      image: imageProvider,
-                      fit: BoxFit.cover,
-                      filterQuality: FilterQuality.high,
-                    ),
-                    errorWidget: (context, url, error) =>
-                        const NullArtworkWidget(iconSize: 30),
-                  )
-                : const NullArtworkWidget(iconSize: 30),
+            Transform.scale(
+              scale: 1.4, // Crop/zoom all song images everywhere
+              child: imageWidget,
+            ),
             if (isDurationAvailable)
               SizedBox(
                 width: size - 10,
@@ -250,7 +251,7 @@ class _SongBarState extends State<SongBar> {
               ),
           ],
         ),
-      ),
+      ),)
     );
   }
 

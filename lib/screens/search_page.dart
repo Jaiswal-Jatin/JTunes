@@ -81,7 +81,7 @@ class _SearchPageState extends State<SearchPage> {
   List _songsSearchResult = [];
   List _albumsSearchResult = [];
   List _playlistsSearchResult = [];
-  List _suggestionsList = [];
+  List<String> _suggestionsList = [];
   List<String> _trendingSearches = [
     'Arijit Singh',
     'Taylor Swift',
@@ -294,261 +294,527 @@ class _SearchPageState extends State<SearchPage> {
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n!.search)),
-      body: SingleChildScrollView(
-        padding: commonSingleChildScrollViewPadding,
-        child: Column(
-          children: <Widget>[
-            CustomSearchBar(
-              loadingProgressNotifier: _fetchingSongs,
-              controller: searchController,
-              focusNode: _inputNode,
-              labelText: '${context.l10n!.search}...',
-              onSubmitted: (String value) {
-                onSearchSubmitted(value);
-                _inputNode.unfocus();
+      appBar: AppBar(
+        title: Text(context.l10n!.search),
+        elevation: 0,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          clearSearchResults();
+          loadSearchHistory();
+        },
+        color: primaryColor,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        child: SingleChildScrollView(
+          padding: commonSingleChildScrollViewPadding,
+          child: Column(
+            children: <Widget>[
+              // Enhanced search bar
+              Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: CustomSearchBar(
+                  loadingProgressNotifier: _fetchingSongs,
+                  controller: searchController,
+                  focusNode: _inputNode,
+                  labelText: '${context.l10n!.search}...',
+                  onSubmitted: (String value) {
+                    onSearchSubmitted(value);
+                    _inputNode.unfocus();
+                  },
+                ),
+              ),
+
+              // Enhanced Trending Searches Section
+              if (!showResults && searchController.text.isEmpty)
+                _buildEnhancedTrendingSection(primaryColor),
+
+              // Enhanced Live Suggestions Section
+              if (_suggestionsList.isNotEmpty && searchController.text.isNotEmpty)
+                _buildEnhancedSuggestionsSection(primaryColor),
+
+              // Enhanced Search History Section
+              if (!showResults ||
+                  (_songsSearchResult.isEmpty && _albumsSearchResult.isEmpty))
+                _buildEnhancedHistorySection(primaryColor),
+
+              // Enhanced Search Results Section
+              if (showResults)
+                _buildEnhancedResultsSection(primaryColor),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEnhancedTrendingSection(Color primaryColor) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [primaryColor, primaryColor.withOpacity(0.7)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.trending_up,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Trending Searches',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: primaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: _trendingSearches.map((trend) {
+              return GestureDetector(
+                onTap: () {
+                  searchController.text = trend;
+                  onSearchSubmitted(trend);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        primaryColor.withOpacity(0.1),
+                        primaryColor.withOpacity(0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: primaryColor.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    trend,
+                    style: TextStyle(
+                      color: primaryColor,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedSuggestionsSection(Color primaryColor) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  FluentIcons.lightbulb_24_regular,
+                  color: primaryColor,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Suggestions',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: primaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+              ),
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _suggestionsList.length,
+              separatorBuilder: (context, index) => Divider(
+                height: 1,
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+              ),
+              itemBuilder: (context, index) {
+                final suggestion = _suggestionsList[index];
+                return ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      FluentIcons.search_24_regular,
+                      color: primaryColor,
+                      size: 16,
+                    ),
+                  ),
+                  title: Text(
+                    suggestion,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                  trailing: Icon(
+                    Icons.north_west,
+                    color: primaryColor.withOpacity(0.6),
+                    size: 16,
+                  ),
+                  onTap: () {
+                    searchController.text = suggestion;
+                    onSearchSubmitted(suggestion);
+                    _inputNode.unfocus();
+                  },
+                );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            // Spotify-style: Trending Searches Section
-            if (!showResults && searchController.text.isEmpty)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    child: Text(
-                      'Trending Searches',
+  Widget _buildEnhancedHistorySection(Color primaryColor) {
+    if (searchHistory.isEmpty) return const SizedBox.shrink();
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        children: [
+          // Enhanced History Header
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        FluentIcons.history_24_regular,
+                        color: primaryColor,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Search History',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: primaryColor,
                       ),
                     ),
+                  ],
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  Wrap(
-                    spacing: 8,
-                    children: _trendingSearches.map((trend) {
-                      return ActionChip(
-                        label: Text(trend),
-                        onPressed: () {
-                          searchController.text = trend;
-                          onSearchSubmitted(trend);
-                        },
-                      );
-                    }).toList(),
+                  child: IconButton(
+                    onPressed: clearSearchHistory,
+                    icon: const Icon(
+                      FluentIcons.delete_24_regular,
+                      color: Colors.red,
+                      size: 20,
+                    ),
+                    tooltip: 'Clear History',
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
+          ),
 
-            // Spotify-style: Live Suggestions Section
-            if (_suggestionsList.isNotEmpty && searchController.text.isNotEmpty)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Text(
-                      'Suggestions',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: primaryColor,
-                      ),
+          // Enhanced History List
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+              ),
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: searchHistory.length,
+              separatorBuilder: (context, index) => Divider(
+                height: 1,
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+              ),
+              itemBuilder: (BuildContext context, int index) {
+                final query = searchHistory[index];
+                return ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      FluentIcons.history_24_regular,
+                      color: primaryColor,
+                      size: 16,
                     ),
                   ),
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _suggestionsList.length,
-                    itemBuilder: (context, index) {
-                      final suggestion = _suggestionsList[index];
-                      return ListTile(
-                        title: Text(suggestion),
-                        leading: Icon(FluentIcons.search_24_regular),
-                        onTap: () {
-                          searchController.text = suggestion;
-                          onSearchSubmitted(suggestion);
-                          _inputNode.unfocus();
-                        },
-                      );
-                    },
+                  title: Text(
+                    query,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
-                ],
-              ),
-
-            // Search History Section (when no results)
-            if (!showResults ||
-                (_songsSearchResult.isEmpty && _albumsSearchResult.isEmpty))
-              Column(
-                children: [
-                  // History Header with Clear Button
-                  if (searchHistory.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Search History',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: primaryColor,
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: clearSearchHistory,
-                            icon: Icon(
-                              FluentIcons.delete_24_regular,
-                              color: primaryColor,
-                            ),
-                            tooltip: 'Clear History',
-                          ),
-                        ],
-                      ),
+                  trailing: PopupMenuButton<String>(
+                    icon: Icon(
+                      Icons.more_vert,
+                      color: primaryColor.withOpacity(0.6),
                     ),
-
-                  // History List
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: searchHistory.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      final query = searchHistory[index];
-                      final borderRadius =
-                          getItemBorderRadius(index, searchHistory.length);
-
-                      return CustomBar(
-                        query,
-                        FluentIcons.history_24_regular,
-                        borderRadius: borderRadius,
-                        onTap: () async {
-                          searchController.text = query;
-                          await performSearch(query);
+                    onSelected: (value) async {
+                      if (value == 'remove') {
+                        final confirm = await _showConfirmationDialog(context, query) ?? false;
+                        if (confirm) {
                           setState(() {
-                            showResults = true;
+                            searchHistory.remove(query);
                           });
-                          _inputNode.unfocus();
-                        },
-                        onLongPress: () async {
-                          final confirm =
-                              await _showConfirmationDialog(context, query) ??
-                                  false;
-                          if (confirm) {
-                            setState(() {
-                              searchHistory.remove(query);
-                            });
-                            await data_manager.addOrUpdateData(
-                                'user', 'searchHistory', searchHistory);
-                          }
-                        },
-                      );
+                          await data_manager.addOrUpdateData('user', 'searchHistory', searchHistory);
+                        }
+                      }
                     },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'remove',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.delete, color: Colors.red, size: 16),
+                            const SizedBox(width: 8),
+                            const Text('Remove'),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                  onTap: () async {
+                    searchController.text = query;
+                    await performSearch(query);
+                    setState(() {
+                      showResults = true;
+                    });
+                    _inputNode.unfocus();
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedResultsSection(Color primaryColor) {
+    return Column(
+      children: [
+        // Enhanced Songs Section
+        if (_songsSearchResult.isNotEmpty) ...[
+          _buildEnhancedSectionTitle('Songs', FluentIcons.music_note_1_24_regular, primaryColor),
+          Container(
+            margin: const EdgeInsets.only(bottom: 24),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
               ),
-
-            // Search Results Section
-            if (showResults)
-              Column(
-                children: [
-                  // Songs Section
-                  if (_songsSearchResult.isNotEmpty) ...[
-                    SectionTitle(context.l10n!.songs, primaryColor),
-                    Column(
-                      children: List.generate(
-                        _songsSearchResult.length > maxSongsInList
-                            ? maxSongsInList
-                            : _songsSearchResult.length,
-                        (index) {
-                          final borderRadius = getItemBorderRadius(
-                            index,
-                            _songsSearchResult.length > maxSongsInList
-                                ? maxSongsInList
-                                : _songsSearchResult.length,
-                          );
-                          // Ensure SongBar gets the image as 'lowResImage' for artwork
-                          final song = _songsSearchResult[index];
-                          final songWithImage = song is Map<String, dynamic>
-                              ? Map<String, dynamic>.from(song)
-                              : song;
-                          if (songWithImage is Map<String, dynamic> &&
-                              songWithImage['image'] != null) {
-                            songWithImage['lowResImage'] =
-                                songWithImage['image'];
-                          }
-                          return SongBar(
-                            songWithImage,
-                            true,
-                            showMusicDuration: false, // Hide duration on image
-                            borderRadius: borderRadius,
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-
-                  // Albums Section
-                  if (_albumsSearchResult.isNotEmpty) ...[
-                    SectionTitle(context.l10n!.albums, primaryColor),
-                    Column(
-                      children: List.generate(
-                        _albumsSearchResult.length > maxSongsInList
-                            ? maxSongsInList
-                            : _albumsSearchResult.length,
-                        (index) {
-                          final playlist = _albumsSearchResult[index];
-                          final borderRadius = getItemBorderRadius(
-                            index,
-                            _albumsSearchResult.length > maxSongsInList
-                                ? maxSongsInList
-                                : _albumsSearchResult.length,
-                          );
-                          return PlaylistBar(
-                            key: ValueKey(playlist['ytid']),
-                            playlist['title'],
-                            playlistId: playlist['ytid'],
-                            playlistData: playlist, // Pass the full playlist data
-                            playlistArtwork: playlist['image'],
-                            cubeIcon: FluentIcons.cd_16_filled,
-                            isAlbum: true,
-                            borderRadius: borderRadius,
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-
-                  // Playlists Section
-                  if (_playlistsSearchResult.isNotEmpty) ...[
-                    SectionTitle(context.l10n!.playlists, primaryColor),
-                    Column(
-                      children: List.generate(
-                        _playlistsSearchResult.length > maxSongsInList
-                            ? maxSongsInList
-                            : _playlistsSearchResult.length,
-                        (index) {
-                          final playlist = _playlistsSearchResult[index];
-                          return PlaylistBar(
-                            key: ValueKey(playlist['ytid']),
-                            playlist['title'],
-                            playlistId: playlist['ytid'],
-                            playlistData: playlist, // Pass the full playlist data with songs
-                            playlistArtwork: playlist['image'] ?? playlist['highResImage'] ?? playlist['lowResImage'], // Ensure image is passed
-                            cubeIcon: FluentIcons.apps_list_24_filled,
-                            borderRadius: getItemBorderRadius(index, _playlistsSearchResult.length > maxSongsInList
-                                ? maxSongsInList
-                                : _playlistsSearchResult.length,),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ],
+            ),
+            child: Column(
+              children: List.generate(
+                _songsSearchResult.length > maxSongsInList
+                    ? maxSongsInList
+                    : _songsSearchResult.length,
+                (index) {
+                  final borderRadius = getItemBorderRadius(
+                    index,
+                    _songsSearchResult.length > maxSongsInList
+                        ? maxSongsInList
+                        : _songsSearchResult.length,
+                  );
+                  final song = _songsSearchResult[index];
+                  final songWithImage = song is Map<String, dynamic>
+                      ? Map<String, dynamic>.from(song)
+                      : song;
+                  if (songWithImage is Map<String, dynamic> &&
+                      songWithImage['image'] != null) {
+                    songWithImage['lowResImage'] = songWithImage['image'];
+                  }
+                  return SongBar(
+                    songWithImage,
+                    true,
+                    showMusicDuration: false,
+                    borderRadius: borderRadius,
+                    backgroundColor: Colors.transparent,
+                  );
+                },
               ),
-          ],
-        ),
+            ),
+          ),
+        ],
+
+        // Enhanced Albums Section
+        if (_albumsSearchResult.isNotEmpty) ...[
+          _buildEnhancedSectionTitle('Albums', FluentIcons.cd_16_filled, primaryColor),
+          Container(
+            margin: const EdgeInsets.only(bottom: 24),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+              ),
+            ),
+            child: Column(
+              children: List.generate(
+                _albumsSearchResult.length > maxSongsInList
+                    ? maxSongsInList
+                    : _albumsSearchResult.length,
+                (index) {
+                  final playlist = _albumsSearchResult[index];
+                  final borderRadius = getItemBorderRadius(
+                    index,
+                    _albumsSearchResult.length > maxSongsInList
+                        ? maxSongsInList
+                        : _albumsSearchResult.length,
+                  );
+                  return PlaylistBar(
+                    key: ValueKey(playlist['ytid']),
+                    playlist['title'],
+                    playlistId: playlist['ytid'],
+                    playlistData: playlist,
+                    playlistArtwork: playlist['image'],
+                    cubeIcon: FluentIcons.cd_16_filled,
+                    isAlbum: true,
+                    borderRadius: borderRadius,
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+
+        // Enhanced Playlists Section
+        if (_playlistsSearchResult.isNotEmpty) ...[
+          _buildEnhancedSectionTitle('Playlists', FluentIcons.apps_list_24_filled, primaryColor),
+          Container(
+            margin: const EdgeInsets.only(bottom: 24),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+              ),
+            ),
+            child: Column(
+              children: List.generate(
+                _playlistsSearchResult.length > maxSongsInList
+                    ? maxSongsInList
+                    : _playlistsSearchResult.length,
+                (index) {
+                  final playlist = _playlistsSearchResult[index];
+                  return PlaylistBar(
+                    key: ValueKey(playlist['ytid']),
+                    playlist['title'],
+                    playlistId: playlist['ytid'],
+                    playlistData: playlist,
+                    playlistArtwork: playlist['image'] ?? playlist['highResImage'] ?? playlist['lowResImage'],
+                    cubeIcon: FluentIcons.apps_list_24_filled,
+                    borderRadius: getItemBorderRadius(
+                      index,
+                      _playlistsSearchResult.length > maxSongsInList
+                          ? maxSongsInList
+                          : _playlistsSearchResult.length,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildEnhancedSectionTitle(String title, IconData icon, Color primaryColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [primaryColor, primaryColor.withOpacity(0.7)],
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: primaryColor,
+            ),
+          ),
+        ],
       ),
     );
   }

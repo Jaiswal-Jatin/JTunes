@@ -42,7 +42,7 @@ dependencies:
   jiosaavn:  
   home_widget: 
   workmanager: 
-  youtube_player_flutter: ^9.1.1
+  youtube_player_flutter: 
   shimmer: ^3.0.0
   lottie: ^3.1.0
  
@@ -52,6 +52,9 @@ dev_dependencies:
     sdk: flutter
   translations_cleaner: 
   flutter_launcher_icons: ^0.13.1
+
+dependency_overrides:
+  collection: ^1.18.0
 
 flutter:
   generate: true

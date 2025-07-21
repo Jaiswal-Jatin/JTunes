@@ -127,7 +127,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     // Get current song immediately for instant color update
     final currentMediaItem = audioHandler.mediaItem.valueOrNull;
     if (currentMediaItem != null) {
-      final imageUrl = currentMediaItem.artUri?.toString();
+      final imageUrl = _getBestImageUrl(currentMediaItem);
       if (imageUrl != null) {
         _updateDominantColor(imageUrl);
       }
@@ -140,7 +140,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     // Listen to mediaItem changes for color and video init
     audioHandler.mediaItem.listen((mediaItem) {
       if (mediaItem != null) {
-        final imageUrl = mediaItem.artUri?.toString();
+        final imageUrl = _getBestImageUrl(mediaItem);
         if (imageUrl != null && imageUrl != _dominantColorImageUrl) {
           _updateDominantColor(imageUrl);
         }
@@ -150,6 +150,25 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
         }
       }
     });
+  }
+
+  // Helper function to get the best quality image URL
+  String? _getBestImageUrl(MediaItem mediaItem) {
+    // Priority: highResImage > artUri > lowResImage
+    final highResImage = mediaItem.extras?['highResImage']?.toString();
+    final artUri = mediaItem.artUri?.toString();
+    final lowResImage = mediaItem.extras?['lowResImage']?.toString();
+    
+    if (highResImage != null && highResImage.isNotEmpty && highResImage != 'null') {
+      return highResImage;
+    }
+    if (artUri != null && artUri.isNotEmpty && artUri != 'null') {
+      return artUri;
+    }
+    if (lowResImage != null && lowResImage.isNotEmpty && lowResImage != 'null') {
+      return lowResImage;
+    }
+    return null;
   }
 
   Future<void> _updateDominantColor(String imageUrl) async {
@@ -505,18 +524,21 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
         // Image background with blur (loads after)
         if (metadata.artUri != null)
           Positioned.fill(
-            child: Image.network(
-              metadata.artUri.toString(),
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) {
-                  return child;
-                }
-                return Container(
-                    color: dominantColor ?? Colors.black.withOpacity(0.85));
-              },
-              errorBuilder: (context, error, stackTrace) => Container(
-                  color: dominantColor ?? Colors.black.withOpacity(0.85)),
+            child: Transform.scale(
+              scale: 1.4, // Crop/zoom the background image
+              child: Image.network(
+                _getBestImageUrl(metadata) ?? metadata.artUri.toString(),
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) {
+                    return child;
+                  }
+                  return Container(
+                      color: dominantColor ?? Colors.black.withOpacity(0.85));
+                },
+                errorBuilder: (context, error, stackTrace) => Container(
+                    color: dominantColor ?? Colors.black.withOpacity(0.85)),
+              ),
             ),
           ),
 
@@ -683,6 +705,25 @@ class NowPlayingArtwork extends StatefulWidget {
 }
 
 class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
+  // Helper function to get the best quality image URL
+  String? _getBestImageUrl(MediaItem mediaItem) {
+    // Priority: highResImage > artUri > lowResImage
+    final highResImage = mediaItem.extras?['highResImage']?.toString();
+    final artUri = mediaItem.artUri?.toString();
+    final lowResImage = mediaItem.extras?['lowResImage']?.toString();
+    
+    if (highResImage != null && highResImage.isNotEmpty && highResImage != 'null') {
+      return highResImage;
+    }
+    if (artUri != null && artUri.isNotEmpty && artUri != 'null') {
+      return artUri;
+    }
+    if (lowResImage != null && lowResImage.isNotEmpty && lowResImage != 'null') {
+      return lowResImage;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     const _padding = 50;
@@ -771,49 +812,46 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
       TextStyle lyricsTextStyle, CardDisplayMode mode) {
     switch (mode) {
       case CardDisplayMode.artwork:
-        // Always try to use the highest quality image available
-        final artUri = widget.metadata.artUri?.toString();
-        final hiRes =
-            (widget.metadata.extras?['highResImage'] as String?)?.trim();
-        final imageUrl = (hiRes != null && hiRes.isNotEmpty)
-            ? hiRes
-            : (artUri != null && artUri.isNotEmpty)
-                ? artUri
-                : null;
+        // Always use the highest quality image available
+        final imageUrl = _getBestImageUrl(widget.metadata);
+        
         return ClipRRect(
           borderRadius: BorderRadius.circular(radius),
-          child: imageUrl != null && imageUrl.isNotEmpty
-              ? CachedNetworkImage(
-                  imageUrl: imageUrl,
-                  width: imageSize,
-                  height: imageSize,
-                  fit: BoxFit.cover,
-                  memCacheWidth: (imageSize * 4).toInt(),
-                  memCacheHeight: (imageSize * 4).toInt(),
-                  filterQuality: FilterQuality.high,
-                  placeholder: (context, url) => Center(
-                    child: SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.5,
+          child: Transform.scale(
+            scale: 1.4, // Crop/zoom all now playing images everywhere
+            child: imageUrl != null && imageUrl.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    width: imageSize,
+                    height: imageSize,
+                    fit: BoxFit.cover,
+                    memCacheWidth: (imageSize * 6).toInt(),
+                    memCacheHeight: (imageSize * 6).toInt(),
+                    filterQuality: FilterQuality.high,
+                    placeholder: (context, url) => Center(
+                      child: SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
                       ),
                     ),
-                  ),
-                  errorWidget: (context, url, error) => Image.asset(
+                    errorWidget: (context, url, error) => Image.asset(
+                      'assets/images/JTunes.png',
+                      fit: BoxFit.cover,
+                      width: imageSize,
+                      height: imageSize,
+                    ),
+                  )
+                : Image.asset(
                     'assets/images/JTunes.png',
                     fit: BoxFit.cover,
                     width: imageSize,
                     height: imageSize,
                   ),
-                )
-              : Image.asset(
-                  'assets/images/JTunes.png',
-                  fit: BoxFit.cover,
-                  width: imageSize,
-                  height: imageSize,
-                ),
+          ),
         );
 
       case CardDisplayMode.lyrics:

@@ -40,34 +40,61 @@ class SongArtworkWidget extends StatelessWidget {
   final double borderRadius;
   final double errorWidgetIconSize;
 
+  // Helper function to get the best quality image URL
+  String? _getBestImageUrl(MediaItem mediaItem) {
+    // Priority: highResImage > artUri > lowResImage
+    final highResImage = mediaItem.extras?['highResImage']?.toString();
+    final artUri = mediaItem.artUri?.toString();
+    final lowResImage = mediaItem.extras?['lowResImage']?.toString();
+    
+    if (highResImage != null && highResImage.isNotEmpty && highResImage != 'null') {
+      return highResImage;
+    }
+    if (artUri != null && artUri.isNotEmpty && artUri != 'null') {
+      return artUri;
+    }
+    if (lowResImage != null && lowResImage.isNotEmpty && lowResImage != 'null') {
+      return lowResImage;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return metadata.artUri?.scheme == 'file'
-        ? SizedBox(
-          width: size,
-          height: size,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(borderRadius),
-            child: Image.file(
-              File(metadata.extras?['artWorkPath']),
-              fit: BoxFit.cover,
-            ),
-          ),
-        )
-        : CachedNetworkImage(
-          key: ValueKey(metadata.artUri.toString()),
-          width: size,
-          height: size,
-          imageUrl: metadata.artUri.toString(),
-          imageBuilder:
-              (context, imageProvider) => ClipRRect(
-                borderRadius: BorderRadius.circular(borderRadius),
-                child: Image(image: imageProvider, fit: BoxFit.cover),
-              ),
-          placeholder: (context, url) => const Spinner(),
-          errorWidget:
-              (context, url, error) =>
-                  NullArtworkWidget(iconSize: errorWidgetIconSize),
-        );
+    Widget imageWidget;
+    if (metadata.artUri?.scheme == 'file') {
+      imageWidget = Image.file(
+        File(metadata.extras?['artWorkPath']),
+        fit: BoxFit.cover,
+      );
+    } else {
+      // Use the best quality image URL
+      final imageUrl = _getBestImageUrl(metadata);
+      imageWidget = CachedNetworkImage(
+        key: ValueKey(imageUrl ?? metadata.artUri.toString()),
+        width: size,
+        height: size,
+        imageUrl: imageUrl ?? metadata.artUri.toString(),
+        imageBuilder: (context, imageProvider) => Image(
+          image: imageProvider,
+          fit: BoxFit.cover,
+        ),
+        placeholder: (context, url) => const Spinner(),
+        errorWidget: (context, url, error) =>
+            NullArtworkWidget(iconSize: errorWidgetIconSize),
+      );
+    }
+    // Always crop/zoom the image everywhere
+    return SizedBox(
+      width: size,
+      height: size,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: Transform.scale(
+          scale: 1.4, // Crop/zoom all song images everywhere
+          child: imageWidget,
+        ),
+      ),
+    );
   }
 }

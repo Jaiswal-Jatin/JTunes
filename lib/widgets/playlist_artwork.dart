@@ -44,66 +44,79 @@ class PlaylistArtwork extends StatelessWidget {
   final double size;
 
   Widget _nullArtwork() => NullArtworkWidget(
-    icon: cubeIcon,
-    iconSize: iconSize,
-    size: size,
-    title: playlistTitle,
-  );
+        icon: cubeIcon,
+        iconSize: iconSize,
+        size: size,
+        title: playlistTitle,
+      );
 
   @override
   Widget build(BuildContext context) {
     final image = playlistArtwork;
     if (image == null) return _nullArtwork();
 
+    Widget imageWidget;
     if (image.startsWith('data:image')) {
       final commaIdx = image.indexOf(',');
       if (commaIdx == -1) return _nullArtwork();
       try {
         final bytes = base64Decode(image.substring(commaIdx + 1));
-        return SizedBox(
-          width: size,
+        imageWidget = Image.memory(
+          bytes,
           height: size,
-          child: ClipRRect(
-            borderRadius: commonBarRadius,
-            child: Image.memory(
-              bytes,
-              height: size,
-              width: size,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _nullArtwork(),
-            ),
-          ),
+          width: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _nullArtwork(),
         );
       } catch (_) {
         return _nullArtwork();
       }
-    }
-
-    if (image.startsWith('http')) {
-      return CachedNetworkImage(
+    } else if (image.startsWith('http')) {
+      imageWidget = CachedNetworkImage(
         key: Key(image),
         height: size,
         width: size,
         imageUrl: image,
         fit: BoxFit.cover,
-        imageBuilder:
-            (_, imageProvider) => SizedBox(
-              width: size,
-              height: size,
-              child: ClipRRect(
-                borderRadius: commonBarRadius,
-                child: Image(
-                  image: imageProvider,
-                  height: size,
-                  width: size,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
+        imageBuilder: (_, imageProvider) => ClipRRect(
+          borderRadius: commonBarRadius,
+          child: Image(
+            image: imageProvider,
+            height: size,
+            width: size,
+            fit: BoxFit.cover,
+          ),
+        ),
+        placeholder: (_, __) => Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade300,
+            borderRadius: commonBarRadius,
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            cubeIcon,
+            size: iconSize,
+            color: Colors.grey.shade700,
+          ),
+        ),
         errorWidget: (_, __, ___) => _nullArtwork(),
       );
+    } else {
+      imageWidget = _nullArtwork();
     }
 
-    return _nullArtwork();
+    return SizedBox(
+      width: size,
+      height: size,
+      child: ClipRRect(
+        borderRadius: commonBarRadius,
+        child: Transform.scale(
+          scale: 1.4, // Crop/zoom all playlist images everywhere
+          child: imageWidget,
+        ),
+      ),
+    );
   }
 }

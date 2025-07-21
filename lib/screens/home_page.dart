@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use, omit_local_variable_types, unnecessary_lambdas, unawaited_futures, unused_field, unused_import, directives_ordering, require_trailing_commas, prefer_final_in_for_each, unused_element_parameter
+// ignore_for_file: deprecated_member_use, omit_local_variable_types, unnecessary_lambdas, unawaited_futures, unused_field, unused_import, directives_ordering, require_trailing_commas, prefer_final_in_for_each, unused_element_parameter, prefer_if_elements_to_conditional_expressions
 
 import 'package:j3tunes/services/youtube_service.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
@@ -147,43 +147,67 @@ class _HomePageState extends State<HomePage>
   }
 
   void _initializeFutures() {
-    // Always use the provided playlist IDs for home screen
-    final yt = YoutubeService();
-    const playlistIds = [
-      'https://www.youtube.com/playlist?list=RDCLAK5uy_n9Fbdw7e6ap-98_A-8JYBmPv64v-Uaq1g&playnext=1&index=1',
-      'https://www.youtube.com/playlist?list=RDCLAK5uy_kuo_NioExeUmw07dFf8BzQ64DFFTlgE7Q&playnext=1&index=1',
-      'https://www.youtube.com/playlist?list=RDCLAK5uy_lj-zBExVYl7YN_NxXboDIh4A-wKGfgzNY&playnext=1&index=1',
-      'PL4fGSI1pDJn5RgLW0Sb_zECecWdH_4zOX',
-      'RDCLAK5uy_ksEjgm3H_7zOJ_RHzRjN1wY-_FFcs7aAU',
-      'RDCLAK5uy_nlKphX00YtBNjlGZcmPifGNAPXUSjezNM',
-      'RDCLAK5uy_lBa7h-v-su4TAsDNvyelrswt9YYYU7x4g',
-      'PL4fGSI1pDJn40WjZ6utkIuj2rNg-7iGsq',
-      'RDCLAK5uy_l_Bj8rMsjkhFMMs-eLrA17_zjr9r6g_Eg',
-      'RDCLAK5uy_m_cn307EUnwiDOgAsOMM27CHhuJCX2ygk',
-      'RDCLAK5uy_lbfDqlFOiRJekoTwNgiES65gcham4ZelA',
-      'RDCLAK5uy_nGC5IUV3lYF-P_wGb-LzMPFydA-RkPblc',
-      'RDCLAK5uy_kymAL5cE4HeekmTy6-3OXYuAucHRpvJ28',
+    // User-provided playlists with only links and titles, no static images
+    final userPlaylists = [
+      {
+        'ytid':
+            'https://www.youtube.com/watch?v=sUf2PtEZris&list=PL4fGSI1pDJn4pTWyM3t61lOyZ6_4jcNOw',
+        'title': 'Playlist 1',
+        'list': <Map<String, dynamic>>[],
+      },
+      {
+        'ytid':
+            'https://www.youtube.com/playlist?list=RDCLAK5uy_n9Fbdw7e6ap-98_A-8JYBmPv64v-Uaq1g&playnext=1&index=1',
+        'title': 'Playlist 2',
+        'list': <Map<String, dynamic>>[],
+      },
+      {
+        'ytid':
+            'https://www.youtube.com/playlist?list=RDCLAK5uy_kjNBBWqyQ_Cy14B0P4xrcKgd39CRjXXKk&playnext=1&index=1',
+        'title': 'Playlist 3',
+        'list': <Map<String, dynamic>>[],
+      },
+      {
+        'ytid':
+            'https://www.youtube.com/playlist?list=RDCLAK5uy_l_Bj8rMsjkhFMMs-eLrA17_zjr9r6g_Eg&playnext=1&index=1',
+        'title': 'Playlist 4',
+        'list': <Map<String, dynamic>>[],
+      },
+      {
+        'ytid':
+            'https://www.youtube.com/playlist?list=RDCLAK5uy_m_cn307EUnwiDOgAsOMM27CHhuJCX2ygk&playnext=1&index=1',
+        'title': 'Playlist 5',
+        'list': <Map<String, dynamic>>[],
+      },
     ];
 
-    _suggestedPlaylistsFuture = Future.wait(playlistIds.map((id) async {
+    _suggestedPlaylistsFuture = Future.wait(userPlaylists.map((playlist) async {
+      final yt = YoutubeService();
       List<Map<String, dynamic>> songMaps = [];
-      String title = id;
-      String image = 'assets/images/JTunes.png';
-
+      String realTitle = (playlist['title'] ?? '').toString();
       try {
-        songMaps = await yt.fetchPlaylistWithFallback(id);
+        songMaps =
+            await yt.fetchPlaylistWithFallback(playlist['ytid'] as String);
+        // Try to get the playlist title from the first song's 'playlistTitle' or 'playlist' field
         if (songMaps.isNotEmpty) {
-          title = songMaps.first['title'] ?? id;
-          image = songMaps.first['image'] ?? 'assets/images/JTunes.png';
+          final firstSong = songMaps[0];
+          if (firstSong['playlistTitle'] != null &&
+              firstSong['playlistTitle'].toString().isNotEmpty) {
+            realTitle = firstSong['playlistTitle'].toString();
+          } else if (firstSong['playlist'] != null &&
+              firstSong['playlist'].toString().isNotEmpty) {
+            realTitle = firstSong['playlist'].toString();
+          } else if (firstSong['album'] != null &&
+              firstSong['album'].toString().isNotEmpty) {
+            realTitle = firstSong['album'].toString();
+          }
         }
       } catch (e) {
-        print('Error fetching playlist $id: $e');
+        print('Error fetching playlist ${playlist['ytid']}: $e');
       }
-
       return {
-        'ytid': id,
-        'title': title,
-        'image': image,
+        'ytid': playlist['ytid'],
+        'title': realTitle,
         'list': songMaps,
       };
     })).then((list) => list);
@@ -355,22 +379,22 @@ class _HomePageState extends State<HomePage>
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
             child: isLoading
-                ? Column(
+                ? const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const HomeHeaderShimmer(),
+                      HomeHeaderShimmer(),
                       HomePlaylistSectionShimmer(title: 'Suggested Playlists'),
-                      HomeSongSectionShimmer(title: 'Trending'),
-                      HomeSongSectionShimmer(title: 'Bollywood'),
-                      HomeSongSectionShimmer(title: 'Punjabi'),
-                      HomeSongSectionShimmer(title: 'Marathi'),
-                      HomeSongSectionShimmer(title: 'Telugu'),
-                      HomeSongSectionShimmer(title: 'Tamil'),
-                      HomeSongSectionShimmer(title: 'K-Pop hits'),
-                      HomeSongSectionShimmer(title: 'Pop music'),
+                      HomeSongSectionShimmer(title: 'Trending Songs'),
+                      HomeSongSectionShimmer(title: 'Bollywood Songs'),
+                      HomeSongSectionShimmer(title: 'Punjabi Songs'),
+                      HomeSongSectionShimmer(title: 'Marathi Songs'),
+                      HomeSongSectionShimmer(title: 'Telugu Songs'),
+                      HomeSongSectionShimmer(title: 'Tamil Songs'),
+                      HomeSongSectionShimmer(title: 'K-Pop Hits'),
+                      HomeSongSectionShimmer(title: 'Pop Music'),
                       HomeSongSectionShimmer(title: 'Rock'),
                       HomePlaylistSectionShimmer(title: 'Your Liked Playlists'),
-                      const SizedBox(height: 80),
+                      SizedBox(height: 80),
                     ],
                   )
                 : Column(
@@ -462,7 +486,7 @@ class _HomePageState extends State<HomePage>
               const SizedBox(width: 8),
               Expanded(
                 child: _buildQuickAccessButton(
-                  'Suggested playlists',
+                  'Suggested Songs',
                   Icons.auto_awesome,
                   () async {
                     if (_trendingSongsFuture != null) {
@@ -473,7 +497,7 @@ class _HomePageState extends State<HomePage>
                           MaterialPageRoute(
                             builder: (context) => PlaylistPage(
                               playlistData: {
-                                'title': 'Suggested playlists',
+                                'title': 'Suggested Songs',
                                 'list': snapshot.take(50).toList(),
                                 'image': snapshot[0]['image'] ??
                                     'assets/images/JTunes.png',
@@ -794,26 +818,38 @@ class _HomePageState extends State<HomePage>
   List<Widget> _buildSongSections() {
     final sections = [
       {
-        'title': 'Trending',
+        'title': 'Trending Songs',
         'future': _trendingSongsFuture,
         'key': 'trending_song'
       },
       {
-        'title': 'Bollywood',
+        'title': 'Bollywood Songs',
         'future': _bollywoodSongsFuture,
         'key': 'bollywood_song'
       },
-      {'title': 'Punjabi', 'future': _punjabSongsFuture, 'key': 'punjabi_song'},
       {
-        'title': 'Marathi',
+        'title': 'Punjabi Songs',
+        'future': _punjabSongsFuture,
+        'key': 'punjabi_song'
+      },
+      {
+        'title': 'Marathi Songs',
         'future': _marathiSongsFuture,
         'key': 'marathi_song'
       },
-      {'title': 'Telugu', 'future': _teluguSongsFuture, 'key': 'telugu_song'},
-      {'title': 'Tamil', 'future': _tamilSongsFuture, 'key': 'tamil_song'},
-      {'title': 'K-Pop hits', 'future': _kpopSongsFuture, 'key': 'kpop_song'},
-      {'title': 'Pop music', 'future': _popSongsFuture, 'key': 'pop_song'},
-      {'title': 'Rock', 'future': _rockSongsFuture, 'key': 'rock_song'},
+      {
+        'title': 'Telugu Songs',
+        'future': _teluguSongsFuture,
+        'key': 'telugu_song'
+      },
+      {
+        'title': 'Tamil Songs',
+        'future': _tamilSongsFuture,
+        'key': 'tamil_song'
+      },
+      {'title': 'K-Pop Hits', 'future': _kpopSongsFuture, 'key': 'k_pop_song'},
+      {'title': 'Pop Music', 'future': _popSongsFuture, 'key': 'pop_song'},
+      {'title': 'Rock Songs', 'future': _rockSongsFuture, 'key': 'rock_song'},
     ];
 
     return sections
@@ -1022,22 +1058,25 @@ class _HomePageState extends State<HomePage>
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  song['lowResImage'] ?? song['image'] ?? '',
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.music_note,
-                        color: Theme.of(context).colorScheme.primary,
-                        size: 28, // Reduced size
-                      ),
-                    );
-                  },
+                child: Transform.scale(
+                  scale: 1.4, // Crop/zoom all home page song images everywhere
+                  child: Image.network(
+                    song['lowResImage'] ?? song['image'] ?? '',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.music_note,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 28, // Reduced size
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
@@ -1061,6 +1100,18 @@ class _HomePageState extends State<HomePage>
   // UPDATED PLAYLIST CARD METHOD - Ab first 4 songs ka combined image dikhega
   Widget _buildPlaylistCardWithOverlay(
       Map<String, dynamic> playlist, double size) {
+    // Show first song's image as playlist image, overlay playlist name at bottom
+    String? imageUrl;
+    if (playlist['list'] != null && playlist['list'].isNotEmpty) {
+      final firstSong = playlist['list'][0];
+      imageUrl = firstSong['artUri'] ??
+          firstSong['image'] ??
+          firstSong['highResImage'] ??
+          firstSong['lowResImage'];
+    }
+    imageUrl ??= 'assets/images/JTunes.png';
+
+    // Remove playlist title overlay from the card image
     return Container(
       width: size,
       height: size * 0.75,
@@ -1077,17 +1128,44 @@ class _HomePageState extends State<HomePage>
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Minimal Blurred Combined 4 Songs Image Grid Background
-            _buildCombinedPlaylistImage(playlist),
-
-            // Dark Overlay for better contrast
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.3),
-              ),
-            ),
-
-            // Playlist Text in Top Right
+            imageUrl.startsWith('http')
+                ? Transform.scale(
+                    scale: 1.4, // Increased value to crop/zoom more
+                    child: Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: Colors.grey[200], // Subtle gray background
+                        child: Center(
+                          child: Icon(
+                            Icons.music_note,
+                            color: Theme.of(context).colorScheme.primary,
+                            size: 30,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                : Transform.scale(
+                    scale: 1.4, // Increased value to crop/zoom more
+                    child: Image.asset(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: Colors.grey[200], // Subtle gray background
+                        child: Center(
+                          child: Icon(
+                            Icons.music_note,
+                            color: Theme.of(context).colorScheme.primary,
+                            size: 30,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+            // Playlist text at top right
             Positioned(
               top: 8,
               right: 8,
@@ -1114,6 +1192,7 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
             ),
+            // Playlist name at bottom is removed
           ],
         ),
       ),
@@ -1121,119 +1200,6 @@ class _HomePageState extends State<HomePage>
   }
 
   // NEW METHOD - First 4 songs ka combined image banane ke liye
-  Widget _buildCombinedPlaylistImage(Map<String, dynamic> playlist) {
-    final List<dynamic> songs = playlist['list'] ?? [];
-    final List<String> imageUrls = [];
-
-    // First 4 songs ke images collect karo
-    for (int i = 0; i < 4; i++) {
-      if (i < songs.length) {
-        final song = songs[i];
-        String? imageUrl = song['artUri'] ??
-            song['image'] ??
-            song['highResImage'] ??
-            song['lowResImage'];
-        if (imageUrl != null &&
-            imageUrl.isNotEmpty &&
-            imageUrl != 'assets/images/JTunes.png') {
-          imageUrls.add(imageUrl);
-        } else {
-          imageUrls.add('assets/images/JTunes.png'); // fallback
-        }
-      } else {
-        imageUrls.add('assets/images/JTunes.png'); // fallback for missing songs
-      }
-    }
-
-    // Agar koi images nahi mili to single default image show karo
-    if (imageUrls.every((url) => url == 'assets/images/JTunes.png')) {
-      return Container(
-        color: Theme.of(context).colorScheme.surface,
-        child: Icon(
-          Icons.music_note,
-          color: Theme.of(context).colorScheme.primary,
-          size: 30,
-        ),
-      );
-    }
-
-    // 2x2 Grid banao
-    return Row(
-      children: [
-        // Left column
-        Expanded(
-          child: Column(
-            children: [
-              // Top-left image
-              Expanded(
-                child: _buildGridImage(imageUrls[0], isTopLeft: true),
-              ),
-              // Bottom-left image
-              Expanded(
-                child: _buildGridImage(imageUrls[2], isBottomLeft: true),
-              ),
-            ],
-          ),
-        ),
-        // Right column
-        Expanded(
-          child: Column(
-            children: [
-              // Top-right image
-              Expanded(
-                child: _buildGridImage(imageUrls[1], isTopRight: true),
-              ),
-              // Bottom-right image
-              Expanded(
-                child: _buildGridImage(imageUrls[3], isBottomRight: true),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 
   // Helper method for individual grid images
-  Widget _buildGridImage(
-    String imageUrl, {
-    bool isTopLeft = false,
-    bool isTopRight = false,
-    bool isBottomLeft = false,
-    bool isBottomRight = false,
-  }) {
-    return Container(
-      margin: EdgeInsets.only(
-        right: isTopLeft || isBottomLeft ? 0.5 : 0,
-        left: isTopRight || isBottomRight ? 0.5 : 0,
-        bottom: isTopLeft || isTopRight ? 0.5 : 0,
-        top: isBottomLeft || isBottomRight ? 0.5 : 0,
-      ),
-      child: imageUrl == 'assets/images/JTunes.png'
-          ? Container(
-              color: Theme.of(context).colorScheme.surface,
-              child: Icon(
-                Icons.music_note,
-                color: Theme.of(context).colorScheme.primary,
-                size: 16,
-              ),
-            )
-          : Image.network(
-              imageUrl,
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: Theme.of(context).colorScheme.surface,
-                  child: Icon(
-                    Icons.music_note,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 16,
-                  ),
-                );
-              },
-            ),
-    );
-  }
 }

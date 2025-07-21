@@ -36,8 +36,8 @@ class PlaylistCube extends StatelessWidget {
     this.size = 220,
     this.borderRadius = 13,
   }) : playlistLikeStatus = ValueNotifier<bool>(
-         isPlaylistAlreadyLiked(playlist['ytid']),
-       );
+          isPlaylistAlreadyLiked(playlist['ytid']),
+        );
 
   final Map? playlistData;
   final Map playlist;
@@ -63,10 +63,13 @@ class PlaylistCube extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          PlaylistArtwork(
-            playlistArtwork: playlist['image'],
-            size: size,
-            cubeIcon: cubeIcon,
+          Transform.scale(
+            scale: 1.4, // Crop/zoom the playlist image from center
+            child: PlaylistArtwork(
+              playlistArtwork: playlist['image'],
+              size: size,
+              cubeIcon: cubeIcon,
+            ),
           ),
           if (borderRadius == 13 && playlist['image'] != null)
             Positioned(
@@ -92,8 +95,8 @@ class PlaylistCube extends StatelessWidget {
             ? context.l10n!.album
             : context.l10n!.playlist,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: colorScheme.onSecondaryContainer,
-        ),
+              color: colorScheme.onSecondaryContainer,
+            ),
       ),
     );
   }
