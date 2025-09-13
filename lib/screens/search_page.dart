@@ -211,13 +211,14 @@ class _SearchPageState extends State<SearchPage> {
 
         final playlists = await musify.search(query, 'playlist');
         final albums = await musify.search('$query album', 'playlist');
+        final artists = await musify.search(query, 'artist');
 
         if (!mounted) return;
         setState(() {
           _songsSearchResult = finalSongsList;
           _playlistsSearchResult = playlists;
           _albumsSearchResult = albums;
-          _artistsSearchResult = []; // Artist search is not supported by this method
+          _artistsSearchResult = artists;
         });
         
       } catch (e) {

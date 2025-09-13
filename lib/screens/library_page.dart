@@ -187,65 +187,16 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Widget _buildUserLikedPlaylistsSection(Color primaryColor) {
-  return ValueListenableBuilder(
-    valueListenable: currentLikedPlaylistsLength,
-    builder: (_, value, __) {
-      // Use the value from the notifier to decide whether to show the section
-      if (value == 0) {
-        return const SizedBox();
-      }
-      
-      return Column(
-        children: [
-          SectionHeader(title: context.l10n!.likedPlaylists),
-          FutureBuilder<List<Map<String, dynamic>>>(
-            future: _loadLikedPlaylistsWithSongs(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              } else if (snapshot.hasError) {
-                logger.log('Error in liked playlists section: ${snapshot.error}', null, null);
-                return Center(child: Text('Error loading playlists'));
-              } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                return _buildPlaylistListView(context, snapshot.data!);
-              } else {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Text('No liked playlists found'),
-                  ),
-                );
-              }
-            },
-          ),
-        ],
-      );
-    },
-  );
-}
-
-Future<List<Map<String, dynamic>>> _loadLikedPlaylistsWithSongs() async {
-  final playlistsWithSongs = <Map<String, dynamic>>[];
-  final likedIds = await getLikedPlaylists();
-
-  for (final id in likedIds) {
-    try {
-      final playlistData = await getPlaylistInfoForWidget(id);
-      if (playlistData != null) {
-        playlistsWithSongs.add(Map<String, dynamic>.from(playlistData));
-      }
-    } catch (e) {
-      logger.log(
-        'Error loading liked playlist $id for library: $e',
-        null,
-        null,
-      );
-    }
+    return ValueListenableBuilder(
+      valueListenable: currentLikedPlaylistsLength,
+      builder: (_, value, __) {
+        if (value == 0) {
+          return const SizedBox();
+        }
+        return _LikedPlaylistsSection();
+      },
+    );
   }
-  
-  logger.log('Loaded ${playlistsWithSongs.length} liked playlists for library', null, null);
-  return playlistsWithSongs;
-}
 
   Widget _buildOfflinePlaylistsSection() {
     return ValueListenableBuilder<List<dynamic>>(
@@ -286,59 +237,60 @@ Future<List<Map<String, dynamic>>> _loadLikedPlaylistsWithSongs() async {
     );
   }
 
-Widget _buildPlaylistListView(
-  BuildContext context,
-  List playlists, {
-  bool isOfflinePlaylists = false,
-}) {
-  if (playlists.isEmpty) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Text('No playlists available'),
-      ),
+  Widget _buildPlaylistListView(
+    BuildContext context,
+    List playlists, {
+    bool isOfflinePlaylists = false,
+  }) {
+    if (playlists.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text('No playlists available'),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: playlists.length,
+      padding: commonListViewBottmomPadding,
+      itemBuilder: (BuildContext context, index) {
+        final rawPlaylist = playlists[index];
+        final playlist = safeMapConvert(rawPlaylist);
+        final borderRadius = getItemBorderRadius(index, playlists.length);
+
+        // Get first song's image from playlist
+        String? dynamicPlaylistImage = playlist['image'];
+
+        // Check if playlist has songs and get first song's image
+        final playlistSongs = safeListConvert(playlist['list']);
+        if (playlistSongs.isNotEmpty) {
+          final randomSong =
+              playlistSongs[Random().nextInt(playlistSongs.length)];
+          dynamicPlaylistImage = randomSong['artUri'] ??
+              randomSong['image'] ??
+              randomSong['highResImage'] ??
+              playlist['image'];
+        }
+
+        return PlaylistBar(
+          key: ValueKey('${playlist['ytid']}_$index'), // More unique key
+          playlist['title'] ?? 'Unknown Playlist',
+          playlistId: playlist['ytid'],
+          playlistArtwork: dynamicPlaylistImage,
+          isAlbum: playlist['isAlbum'] ?? false,
+          playlistData: playlist,
+          onDelete: playlist['source'] == 'user-created' ||
+                  playlist['source'] == 'user-youtube'
+              ? () => _showRemovePlaylistDialog(playlist)
+              : null,
+          borderRadius: borderRadius,
+        );
+      },
     );
   }
-
-  return ListView.builder(
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    itemCount: playlists.length,
-    padding: commonListViewBottmomPadding,
-    itemBuilder: (BuildContext context, index) {
-      final rawPlaylist = playlists[index];
-      final playlist = safeMapConvert(rawPlaylist);
-      final borderRadius = getItemBorderRadius(index, playlists.length);
-
-      // Get first song's image from playlist
-      String? dynamicPlaylistImage = playlist['image'];
-
-      // Check if playlist has songs and get first song's image
-      final playlistSongs = safeListConvert(playlist['list']);
-      if (playlistSongs.isNotEmpty) {
-        final randomSong = playlistSongs[Random().nextInt(playlistSongs.length)];
-        dynamicPlaylistImage = randomSong['artUri'] ??
-            randomSong['image'] ??
-            randomSong['highResImage'] ??
-            playlist['image'];
-      }
-
-      return PlaylistBar(
-        key: ValueKey('${playlist['ytid']}_$index'), // More unique key
-        playlist['title'] ?? 'Unknown Playlist',
-        playlistId: playlist['ytid'],
-        playlistArtwork: dynamicPlaylistImage,
-        isAlbum: playlist['isAlbum'] ?? false,
-        playlistData: playlist,
-        onDelete: playlist['source'] == 'user-created' ||
-                playlist['source'] == 'user-youtube'
-            ? () => _showRemovePlaylistDialog(playlist)
-            : null,
-        borderRadius: borderRadius,
-      );
-    },
-  );
-}
 
   void _showAddPlaylistDialog() => showDialog(
         context: context,
@@ -352,7 +304,8 @@ Widget _buildPlaylistListView(
           return StatefulBuilder(
             builder: (context, dialogSetState) {
               final theme = Theme.of(context);
-              final activeButtonBackground = theme.colorScheme.surfaceContainer;
+              final activeButtonBackground =
+                  theme.colorScheme.surfaceContainer;
               final inactiveButtonBackground =
                   theme.colorScheme.secondaryContainer;
               final dialogBackgroundColor = theme.dialogTheme.backgroundColor;
@@ -416,7 +369,8 @@ Widget _buildPlaylistListView(
                                   ? activeButtonBackground
                                   : inactiveButtonBackground,
                             ),
-                            child: const Icon(FluentIcons.person_add_24_filled),
+                            child:
+                                const Icon(FluentIcons.person_add_24_filled),
                           ),
                         ],
                       ),
@@ -525,4 +479,78 @@ Widget _buildPlaylistListView(
           );
         },
       );
+}
+
+class _LikedPlaylistsSection extends StatefulWidget {
+  @override
+  __LikedPlaylistsSectionState createState() => __LikedPlaylistsSectionState();
+}
+
+class __LikedPlaylistsSectionState extends State<_LikedPlaylistsSection> {
+  late Future<List<Map<String, dynamic>>> _likedPlaylistsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _likedPlaylistsFuture = _loadLikedPlaylistsWithSongs();
+  }
+
+  Future<List<Map<String, dynamic>>> _loadLikedPlaylistsWithSongs() async {
+    final playlistsWithSongs = <Map<String, dynamic>>[];
+    final likedIds = await getLikedPlaylists();
+
+    for (final id in likedIds) {
+      try {
+        final playlistData = await getPlaylistInfoForWidget(id);
+        if (playlistData != null) {
+          playlistsWithSongs.add(Map<String, dynamic>.from(playlistData));
+        }
+      } catch (e) {
+        logger.log(
+          'Error loading liked playlist $id for library: $e',
+          null,
+          null,
+        );
+      }
+    }
+
+    logger.log(
+        'Loaded ${playlistsWithSongs.length} liked playlists for library',
+        null,
+        null);
+    return playlistsWithSongs;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SectionHeader(title: context.l10n!.likedPlaylists),
+        FutureBuilder<List<Map<String, dynamic>>>(
+          future: _likedPlaylistsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError) {
+              logger.log(
+                  'Error in liked playlists section: ${snapshot.error}',
+                  null,
+                  null);
+              return Center(child: Text('Error loading playlists'));
+            } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+              return (context.findAncestorStateOfType<_LibraryPageState>()!)
+                  ._buildPlaylistListView(context, snapshot.data!);
+            } else {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('No liked playlists found'),
+                ),
+              );
+            }
+          },
+        ),
+      ],
+    );
+  }
 }

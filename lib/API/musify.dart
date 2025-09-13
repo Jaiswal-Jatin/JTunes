@@ -1483,45 +1483,18 @@ Future<Map<String, dynamic>?> getFallbackSong({List<String> excludeIds = const [
 }
 
 Future<void> addOrUpdateData(String group, String key, dynamic value) async {
-  final prefs = await SharedPreferences.getInstance();
-  if (value is String) {
-    await prefs.setString('$group-$key', value);
-  } else if (value is int) {
-    await prefs.setInt('$group-$key', value);
-  } else if (value is double) {
-    await prefs.setDouble('$group-$key', value);
-  } else if (value is bool) {
-    await prefs.setBool('$group-$key', value);
-  } else if (value is List<String>) {
-    await prefs.setStringList('$group-$key', value);
-  } else if (value is List || value is Map) {
-    try {
-      await prefs.setString('$group-$key', json.encode(value));
-    } catch (e, stackTrace) {
-      logger.log(
-          'Error encoding data for caching: ${value.runtimeType}', e, stackTrace);
-    }
-  } else {
-    logger.log(
-        'Unsupported data type for caching: ${value.runtimeType}', null, null);
-  }
+  final box = await Hive.openBox(group);
+  await box.put(key, value);
 }
 
 Future<dynamic> getData(String group, String key) async {
-  final prefs = await SharedPreferences.getInstance();
-  final value = prefs.get('$group-$key');
-
-  if (value is String) {
-    try {
-      // Try to decode if it's a JSON string (for Lists and Maps)
-      return json.decode(value);
-    } catch (e) {
-      // Not a JSON string, return as is
-      return value;
-    }
+  final box = await Hive.openBox(group);
+  // Hive automatically handles serialization/deserialization for basic types,
+  // Lists, and Maps, so no need for manual JSON decoding.
+  if (box.containsKey(key)) {
+    return box.get(key);
   }
-
-  return value;
+  return null;
 }
 
 Future<Map<String, dynamic>?> getPlaylistInfoForWidgetCached(String playlistId) async {
