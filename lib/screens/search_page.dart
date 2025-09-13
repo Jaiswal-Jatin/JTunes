@@ -1,5 +1,6 @@
 // ignore_for_file: unused_field, unnecessary_parenthesis, require_trailing_commas, prefer_const_constructors, prefer_int_literals, directives_ordering, prefer_final_fields, omit_local_variable_types, prefer_final_locals, avoid_redundant_argument_values
 
+import 'package:j3tunes/screens/playlist_page.dart';
 /*
  *     Copyright (C) 2025 Valeri Gokadze
  *
@@ -38,9 +39,11 @@ import 'package:j3tunes/widgets/custom_search_bar.dart';
 import 'package:j3tunes/widgets/playlist_bar.dart';
 import 'package:j3tunes/widgets/section_title.dart';
 import 'package:j3tunes/widgets/song_bar.dart';
+import 'package:j3tunes/widgets/playlist_cube.dart';
 import 'package:j3tunes/API/musify.dart' as musify;
 import 'package:j3tunes/screens/artist_page.dart';
 import 'package:j3tunes/widgets/shimmer_widgets.dart';
+import 'package:shimmer/shimmer.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -182,15 +185,36 @@ class _SearchPageState extends State<SearchPage> {
           _playlistsSearchResult.clear();
         });
 
-        // Use the reliable search from musify.dart
+        // Get initial songs for the query
         final songs = await musify.search(query, 'song');
+        final List<Map<String, dynamic>> finalSongsList = List<Map<String, dynamic>>.from(songs);
+
+        // If we found songs, get related songs for the top result
+        if (songs.isNotEmpty) {
+          final topSongId = songs.first['ytid'] as String?;
+          if (topSongId != null) {
+            final recommendedSongs = await musify.getNextRecommendedSongs(
+              topSongId,
+              count: 15, // Fetch more recommendations
+              excludeIds: [topSongId],
+            );
+
+            // Add unique recommended songs to the list
+            final seenIds = {topSongId};
+            for (final recSong in recommendedSongs) {
+              if (seenIds.add(recSong['ytid'] as String)) {
+                finalSongsList.add(recSong);
+              }
+            }
+          }
+        }
+
         final playlists = await musify.search(query, 'playlist');
-        // A simple way to get albums is to search for "query album"
         final albums = await musify.search('$query album', 'playlist');
 
         if (!mounted) return;
         setState(() {
-          _songsSearchResult = songs;
+          _songsSearchResult = finalSongsList;
           _playlistsSearchResult = playlists;
           _albumsSearchResult = albums;
           _artistsSearchResult = []; // Artist search is not supported by this method
@@ -224,6 +248,9 @@ class _SearchPageState extends State<SearchPage> {
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
+    final showSuggestions = _suggestionsList.isNotEmpty && searchController.text.isNotEmpty;
+    final showInitialView = !showResults && !showSuggestions;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(context.l10n!.search),
@@ -266,19 +293,11 @@ class _SearchPageState extends State<SearchPage> {
                 ),
               ),
 
-              // Enhanced Trending Searches Section
-              if (!showResults && searchController.text.isEmpty)
-                _buildEnhancedTrendingSection(primaryColor),
-
-              // Enhanced Live Suggestions Section
-              if (_suggestionsList.isNotEmpty && searchController.text.isNotEmpty)
+              // Conditional UI
+              if (showInitialView)
+                _buildInitialSearchBody(primaryColor),
+              if (showSuggestions)
                 _buildEnhancedSuggestionsSection(primaryColor),
-
-              // Enhanced Search History Section
-              if (!showResults && searchController.text.isEmpty)
-                _buildEnhancedHistorySection(primaryColor),
-
-              // Enhanced Search Results Section
               if (showResults) _buildSearchResults(primaryColor),
             ],
           ),
@@ -297,80 +316,104 @@ class _SearchPageState extends State<SearchPage> {
     return _buildEnhancedResultsSection(primaryColor);
   }
 
-  Widget _buildEnhancedTrendingSection(Color primaryColor) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [primaryColor, primaryColor.withOpacity(0.7)],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.trending_up,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Trending Searches',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: primaryColor,
-                  ),
-                ),
-              ],
+  Widget _buildInitialSearchBody(Color primaryColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (searchHistory.isNotEmpty) ...[
+          _buildEnhancedHistorySection(primaryColor),
+          const SizedBox(height: 24),
+        ],
+        _buildBrowseAllSection(primaryColor),
+      ],
+    );
+  }
+
+  Widget _buildBrowseAllSection(Color primaryColor) {
+    final categories = [
+      {'title': 'Top Hits', 'color': Colors.red, 'icon': FluentIcons.trophy_24_filled},
+      {'title': 'Bollywood', 'color': Colors.orange, 'icon': FluentIcons.filmstrip_24_filled},
+      {'title': 'Punjabi', 'color': Colors.green, 'icon': FluentIcons.music_note_2_24_filled},
+      {'title': 'K-Pop', 'color': Colors.pink, 'icon': FluentIcons.heart_24_filled},
+      {'title': 'Romantic', 'color': Colors.redAccent, 'icon': FluentIcons.heart_pulse_24_filled},
+      {'title': 'Party', 'color': Colors.purple, 'icon': FluentIcons.drink_margarita_24_filled},
+      {'title': 'Workout', 'color': Colors.blue, 'icon': FluentIcons.dumbbell_24_filled},
+      {'title': 'Lo-fi', 'color': Colors.teal, 'icon': FluentIcons.weather_moon_24_filled},
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
+          child: Text(
+            'Browse Categories',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
           ),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: _trendingSearches.map((trend) {
-              return GestureDetector(
-                onTap: () {
-                  searchController.text = trend;
-                  onSearchSubmitted(trend);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        primaryColor.withOpacity(0.1),
-                        primaryColor.withOpacity(0.05),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: primaryColor.withOpacity(0.2),
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    trend,
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
+        ),
+        const SizedBox(height: 16),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: categories.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 16 / 8,
           ),
-        ],
-      ),
+          itemBuilder: (context, index) {
+            final category = categories[index];
+            final title = category['title'] as String;
+            final color = category['color'] as Color;
+            final icon = category['icon'] as IconData;
+
+            return GestureDetector(
+              onTap: () {
+                searchController.text = title;
+                onSearchSubmitted(title);
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [color.withOpacity(0.7), color],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      bottom: -20,
+                      right: -15,
+                      child: Icon(
+                        icon,
+                        size: 80,
+                        color: Colors.white.withOpacity(0.15),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -458,139 +501,72 @@ class _SearchPageState extends State<SearchPage> {
   Widget _buildEnhancedHistorySection(Color primaryColor) {
     if (searchHistory.isEmpty) return const SizedBox.shrink();
     
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        children: [
-          // Enhanced History Header
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        FluentIcons.history_24_regular,
-                        color: primaryColor,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Search History',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: primaryColor,
-                      ),
-                    ),
-                  ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Recent Searches',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                 ),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: IconButton(
-                    onPressed: clearSearchHistory,
-                    icon: const Icon(
-                      FluentIcons.delete_24_regular,
-                      color: Colors.red,
-                      size: 20,
+              ),
+              if (searchHistory.isNotEmpty)
+                TextButton(
+                  onPressed: clearSearchHistory,
+                  child: Text(
+                    'CLEAR ALL',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.secondary,
+                      fontWeight: FontWeight.w600,
                     ),
-                    tooltip: 'Clear History',
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
-
-          // Enhanced History List
-          Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+        ),
+        const SizedBox(height: 8),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: searchHistory.length > 5 ? 5 : searchHistory.length,
+          itemBuilder: (BuildContext context, int index) {
+            final query = searchHistory[index];
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+              leading: Icon(FluentIcons.history_24_regular, color: Theme.of(context).colorScheme.secondary),
+              title: Text(
+                query,
+                style: const TextStyle(fontWeight: FontWeight.w500),
               ),
-            ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: searchHistory.length,
-              separatorBuilder: (context, index) => Divider(
-                height: 1,
-                color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
-              ),
-              itemBuilder: (BuildContext context, int index) {
-                final query = searchHistory[index];
-                return ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      FluentIcons.history_24_regular,
-                      color: primaryColor,
-                      size: 16,
-                    ),
-                  ),
-                  title: Text(
-                    query,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                  trailing: PopupMenuButton<String>(
-                    icon: Icon(
-                      Icons.more_vert,
-                      color: primaryColor.withOpacity(0.6),
-                    ),
-                    onSelected: (value) async {
-                      if (value == 'remove') {
-                        final confirm = await _showConfirmationDialog(context, query) ?? false;
-                        if (confirm) {
-                          setState(() {
-                            searchHistory.remove(query);
-                          });
-                          await data_manager.addOrUpdateData('user', 'searchHistory', searchHistory);
-                        }
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'remove',
-                        child: Row(
-                          children: [
-                            const Icon(Icons.delete, color: Colors.red, size: 16),
-                            const SizedBox(width: 8),
-                            const Text('Remove'),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  onTap: () async {
-                    searchController.text = query;
-                    await performSearch(query);
+              trailing: IconButton(
+                icon: Icon(Icons.clear, size: 20, color: Theme.of(context).colorScheme.secondary.withOpacity(0.7)),
+                tooltip: 'Remove from history',
+                onPressed: () async {
+                  final confirm = await _showConfirmationDialog(context, query) ?? false;
+                  if (confirm) {
                     setState(() {
-                      showResults = true;
+                      searchHistory.remove(query);
                     });
-                    _inputNode.unfocus();
-                  },
-                );
+                    await data_manager.addOrUpdateData('user', 'searchHistory', searchHistory);
+                  }
+                },
+              ),
+              onTap: () {
+                searchController.text = query;
+                onSearchSubmitted(query);
+                _inputNode.unfocus();
               },
-            ),
-          ),
-        ],
-      ),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -673,83 +649,76 @@ class _SearchPageState extends State<SearchPage> {
 
         // Enhanced Albums Section
         if (_albumsSearchResult.isNotEmpty) ...[
-          _buildEnhancedSectionTitle('Albums', FluentIcons.cd_16_filled, primaryColor),
-          Container(
-            margin: const EdgeInsets.only(bottom: 24),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
-              ),
-            ),
-            child: Column(
-              children: List.generate(
-                _albumsSearchResult.length > maxResultsToShow
-                    ? maxResultsToShow
-                    : _albumsSearchResult.length,
-                (index) {
-                  final playlist = _albumsSearchResult[index];
-                  final borderRadius = getItemBorderRadius(
-                    index,
-                    _albumsSearchResult.length > maxResultsToShow
-                        ? maxResultsToShow
-                        : _albumsSearchResult.length,
-                  );
-                  return PlaylistBar(
-                    key: ValueKey(playlist['ytid']),
-                    playlist['title'],
-                    playlistId: playlist['ytid'],
-                    playlistData: playlist,
-                    playlistArtwork: playlist['image'],
-                    cubeIcon: FluentIcons.cd_16_filled,
-                    isAlbum: true,
-                    borderRadius: borderRadius,
-                  );
-                },
-              ),
-            ),
+          _buildHorizontalCardSection(
+            title: 'Albums',
+            icon: FluentIcons.cd_16_filled,
+            primaryColor: primaryColor,
+            items: _albumsSearchResult,
+            isAlbum: true,
           ),
         ],
 
         // Enhanced Playlists Section
         if (_playlistsSearchResult.isNotEmpty) ...[
-          _buildEnhancedSectionTitle('Playlists', FluentIcons.apps_list_24_filled, primaryColor),
-          Container(
-            margin: const EdgeInsets.only(bottom: 24),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
-              ),
-            ),
-            child: Column(
-              children: List.generate(
-                _playlistsSearchResult.length > maxResultsToShow
-                    ? maxResultsToShow
-                    : _playlistsSearchResult.length,
-                (index) {
-                  final playlist = _playlistsSearchResult[index];
-                  return PlaylistBar(
-                    key: ValueKey(playlist['ytid']),
-                    playlist['title'] ?? 'Unknown Playlist',
-                    playlistId: playlist['ytid'],
-                    playlistData: playlist,
-                    playlistArtwork: playlist['thumbnails']?.last?['url'] ?? playlist['image'],
-                    cubeIcon: FluentIcons.apps_list_24_filled,
-                    borderRadius: getItemBorderRadius(
-                      index,
-                      _playlistsSearchResult.length > maxResultsToShow
-                          ? maxResultsToShow
-                          : _playlistsSearchResult.length,
-                    ),
-                  );
-                },
-              ),
-            ),
+          _buildHorizontalCardSection(
+            title: 'Playlists',
+            icon: FluentIcons.apps_list_24_filled,
+            primaryColor: primaryColor,
+            items: _playlistsSearchResult,
+            isAlbum: false,
           ),
         ],
+      ],
+    );
+  }
+
+  Widget _buildHorizontalCardSection({
+    required String title,
+    required IconData icon,
+    required Color primaryColor,
+    required List items,
+    required bool isAlbum,
+  }) {
+    const cardSize = 150.0;
+    return Column(
+      children: [
+        _buildEnhancedSectionTitle(title, icon, primaryColor),
+        SizedBox(
+          height: cardSize + 50, // Card size + text height + padding
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: items.length,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PlaylistPage(playlistData: item),
+                  ),
+                ),
+                child: Container(
+                  width: cardSize,
+                  margin: const EdgeInsets.only(right: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      PlaylistCube(item, size: cardSize, cubeIcon: icon),
+                      const SizedBox(height: 8),
+                      Text(
+                        item['title'] ?? 'Unknown',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
       ],
     );
   }
@@ -843,15 +812,66 @@ class _SearchPageState extends State<SearchPage> {
 
 class SearchShimmer extends StatelessWidget {
   const SearchShimmer({super.key});
-
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: const [
-        HomeSongSectionShimmer(title: 'Songs'),
-        HomeSongSectionShimmer(title: 'Artists'),
-        HomePlaylistSectionShimmer(title: 'Playlists'),
-      ],
+    return Shimmer.fromColors(
+      baseColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+      highlightColor: Theme.of(context).colorScheme.surfaceVariant,
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Shimmer for Songs section
+            _buildShimmerSectionTitle(context),
+            _buildShimmerList(context, 5),
+            const SizedBox(height: 24),
+
+            // Shimmer for Albums section
+            _buildShimmerSectionTitle(context),
+            _buildShimmerHorizontalList(context),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShimmerSectionTitle(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+      child: _ShimmerBox(height: 24, width: 120, borderRadius: 8),
+    );
+  }
+
+  Widget _buildShimmerList(BuildContext context, int count) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: List.generate(count, (index) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+            child: Row(
+              children: [
+                _ShimmerBox(height: 56, width: 56, borderRadius: 8),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _ShimmerBox(height: 16, width: double.infinity, borderRadius: 4),
+                      SizedBox(height: 8),
+                      _ShimmerBox(height: 12, width: 100, borderRadius: 4),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ),
     );
   }
 }
@@ -889,4 +909,54 @@ class NoResults extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ShimmerBox extends StatelessWidget {
+  final double height;
+  final double width;
+  final double borderRadius;
+
+  const _ShimmerBox({
+    required this.height,
+    required this.width,
+    this.borderRadius = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      width: width,
+      decoration: BoxDecoration(
+        color: Colors.white, // This color will be overridden by Shimmer.fromColors
+        borderRadius: BorderRadius.circular(borderRadius),
+      ),
+    );
+  }
+}
+
+Widget _buildShimmerHorizontalList(BuildContext context) {
+  const cardSize = 150.0;
+  return SizedBox(
+    height: cardSize + 50,
+    child: ListView.builder(
+      scrollDirection: Axis.horizontal,
+      itemCount: 5,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      itemBuilder: (context, index) {
+        return Container(
+          width: cardSize,
+          margin: const EdgeInsets.only(right: 16),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ShimmerBox(height: cardSize, width: cardSize, borderRadius: 12),
+              SizedBox(height: 8),
+              _ShimmerBox(height: 14, width: 120, borderRadius: 4),
+            ],
+          ),
+        );
+      },
+    ),
+  );
 }

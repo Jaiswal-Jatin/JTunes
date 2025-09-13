@@ -1341,6 +1341,9 @@ Future<List<Map<String, dynamic>>> search(String query, String type) async {
           .map((playlist) => {
                 'ytid': playlist.id.toString(),
                 'title': playlist.title,
+            'image': playlist.thumbnails.isNotEmpty
+                ? playlist.thumbnails.last.url.toString()
+                : null,
                 'source': 'youtube',
                 'list': [],
               })
