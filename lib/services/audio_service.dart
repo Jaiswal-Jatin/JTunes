@@ -27,6 +27,7 @@ import 'dart:io';
 import 'package:j3tunes/API/musify.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
+import 'package:j3tunes/screens/equalizer_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:j3tunes/main.dart' hide logger;
 import 'package:j3tunes/models/position_data.dart';
@@ -61,6 +62,18 @@ class J3TunesAudioHandler extends BaseAudioHandler {
   String? _currentPlaylistId;
 
   J3TunesAudioHandler() {
+    audioPlayer = AudioPlayer(
+      audioLoadConfiguration: const AudioLoadConfiguration(
+        androidLoadControl: AndroidLoadControl(
+          maxBufferDuration: Duration(seconds: 60),
+          bufferForPlaybackDuration: Duration(milliseconds: 500),
+          bufferForPlaybackAfterRebufferDuration: Duration(seconds: 3),
+        ),
+      ),
+      audioPipeline: AudioPipeline(
+        androidAudioEffects: [EqualizerService().equalizer],
+      ),
+    );
     _setupEventSubscriptions();
     _updatePlaybackState();
 
@@ -70,19 +83,10 @@ class J3TunesAudioHandler extends BaseAudioHandler {
         usage: AndroidAudioUsage.media,
       ),
     );
-
     _initialize();
   }
 
-  final AudioPlayer audioPlayer = AudioPlayer(
-    audioLoadConfiguration: const AudioLoadConfiguration(
-      androidLoadControl: AndroidLoadControl(
-        maxBufferDuration: Duration(seconds: 60),
-        bufferForPlaybackDuration: Duration(milliseconds: 500),
-        bufferForPlaybackAfterRebufferDuration: Duration(seconds: 3),
-      ),
-    ),
-  );
+  late final AudioPlayer audioPlayer;
 
   Timer? _sleepTimer;
   bool sleepTimerExpired = false;
@@ -91,7 +95,7 @@ class J3TunesAudioHandler extends BaseAudioHandler {
   final List<Map> _historyList = [];
   int _currentQueueIndex = 0;
   bool _isLoadingNextSong = false;
-  bool _isCreatingAutoPlaylist = false;
+  int _autoPlaylistVersion = 0;
 
   // Error handling
   String? _lastError;
@@ -234,12 +238,75 @@ class J3TunesAudioHandler extends BaseAudioHandler {
           !sleepTimerExpired) {
         Future.delayed(
           const Duration(milliseconds: 100),
-          _handleSongCompletion,
+          () {
+            if (_currentQueueIndex < _queueList.length) {
+              _addToHistory(_queueList[_currentQueueIndex]);
+            }
+            // Song completed, so skip to the next one.
+            // skipToNext will handle repeat modes, queue, and auto-play.
+            skipToNext();
+          },
         );
       }
       _updatePlaybackState();
     } catch (e, stackTrace) {
       logger.log('Error handling playback event', e, stackTrace);
+    }
+  }
+
+  Future<void> _handleAutoPlayNext() async {
+    // Lock to prevent multiple concurrent executions.
+    if (_isLoadingNextSong) { 
+      print('[AudioHandler] Already loading next song, skipping');
+      return;
+    }
+
+    _isLoadingNextSong = true;
+    print('[AudioHandler] Starting auto-play next song process');
+
+    try {
+      final currentMediaItem = mediaItem.valueOrNull;
+      if (currentMediaItem == null) {
+        print('[AudioHandler] No current media item for auto-play');
+        return;
+      }
+
+      final currentYtid = currentMediaItem.extras?['ytid'];
+      if (currentYtid == null) {
+        print('[AudioHandler] No ytid in current media item');
+        return;
+      }
+
+      print('[AudioHandler] Getting a recommended song for: $currentYtid');
+
+      // 1. Try to get a recommendation
+      final recommendations = await getNextRecommendedSongs(currentYtid, count: 1);
+      Map<String, dynamic>? nextSong;
+
+      if (recommendations.isNotEmpty) {
+        nextSong = recommendations.first;
+        print('[AudioHandler] Found recommended song: ${nextSong['title']}');
+      } else {
+        // 2. If no recommendation, get a fallback song
+        print('[AudioHandler] No recommendation found. Trying fallback...');
+        nextSong = await getFallbackSong(excludeIds: _queueList.map((s) => s['ytid'] as String).toList());
+      }
+
+      if (nextSong != null) {
+        print('[AudioHandler] Playing next song: ${nextSong['title']}');
+        // This will clear the queue and play the single song, enabling radio mode.
+        await playSong(nextSong);
+      } else {
+        print(
+            '[AudioHandler] FATAL: No recommended or fallback song found. Stopping playback.');
+        // This should ideally never happen with the new fallback logic.
+        await stop();
+      }
+    } catch (e, stackTrace) {
+      logger.log('Error in _handleAutoPlayNext', e, stackTrace);
+    } finally {
+      _isLoadingNextSong = false; // Unlock at the very end of the process.
+      print('[AudioHandler] Auto-play process completed');
     }
   }
 
@@ -267,186 +334,64 @@ class J3TunesAudioHandler extends BaseAudioHandler {
     }
   }
 
-  Future<void> _handleSongCompletion() async {
-    try {
-      if (_currentQueueIndex < _queueList.length) {
-        _addToHistory(_queueList[_currentQueueIndex]);
-      }
-
-      // Check repeat mode first
-      if (repeatNotifier.value == AudioServiceRepeatMode.one) {
-        print('[AudioHandler] Repeat one mode, playing again');
-        await playAgain();
-        return;
-      }
-
-      // Check if there's a next song in queue
-      if (_currentQueueIndex < _queueList.length - 1) {
-        print('[AudioHandler] Playing next song in queue');
-        await _playFromQueue(_currentQueueIndex + 1);
-        return;
-      }
-
-      // Check repeat all mode
-      if (repeatNotifier.value == AudioServiceRepeatMode.all &&
-          _queueList.isNotEmpty) {
-        print('[AudioHandler] Repeat all mode, playing first song');
-        await _playFromQueue(0);
-        return;
-      }
-
-      // Auto-play next song if enabled
-      if (playNextSongAutomatically.value) {
-        print('[AudioHandler] Auto-playing next recommended song');
-        await _handleAutoPlayNext();
-      } else {
-        print('[AudioHandler] Song completed, no auto-play');
-      }
-    } catch (e, stackTrace) {
-      logger.log('Error handling song completion', e, stackTrace);
-    }
-  }
-
-  Future<void> _handleAutoPlayNext() async {
-    if (_isLoadingNextSong) {
-      print('[AudioHandler] Already loading next song, skipping');
+  Future<void> _createAutoPlaylist(String seedSongId, int version) async {
+    // This check ensures that only the playlist creation for the LATEST song runs.
+    if (version != _autoPlaylistVersion) {
+      print('[AudioHandler] Cancelling stale auto-playlist creation.');
       return;
     }
 
-    _isLoadingNextSong = true;
-    print('[AudioHandler] Starting auto-play next song process');
-
-    try {
-      // If queue has more songs, play next from queue
-      if (_currentQueueIndex < _queueList.length - 1) {
-        print('[AudioHandler] Playing next song from existing queue');
-        await _playFromQueue(_currentQueueIndex + 1);
-        return;
-      }
-
-      // If queue is small, create more songs
-      if (_queueList.length <= 3) {
-        print('[AudioHandler] Queue is small, creating auto-playlist');
-        final currentSong = _currentQueueIndex < _queueList.length
-            ? _queueList[_currentQueueIndex]
-            : null;
-        if (currentSong != null) {
-          await _createAutoPlaylist(currentSong['ytid']);
-          // After creating playlist, play next song if available
-          if (_currentQueueIndex < _queueList.length - 1) {
-            await _playFromQueue(_currentQueueIndex + 1);
-          }
-        }
-        return;
-      }
-
-      // Fallback: Get single similar song
-      final currentMediaItem = mediaItem.valueOrNull;
-      if (currentMediaItem == null) {
-        print('[AudioHandler] No current media item for auto-play');
-        return;
-      }
-
-      final currentYtid = currentMediaItem.extras?['ytid'];
-      if (currentYtid == null) {
-        print('[AudioHandler] No ytid in current media item');
-        return;
-      }
-
-      print('[AudioHandler] Getting single similar song for: $currentYtid');
-
-      // Clear any existing recommendation first
-      nextRecommendedSong = null;
-
-      // Get similar song
-      getSimilarSong(currentYtid);
-
-      // Wait for recommendation with timeout
-      final maxWaitTime = DateTime.now().add(const Duration(seconds: 8));
-      while (
-          nextRecommendedSong == null && DateTime.now().isBefore(maxWaitTime)) {
-        await Future.delayed(const Duration(milliseconds: 300));
-      }
-
-      if (nextRecommendedSong != null) {
-        print(
-            '[AudioHandler] Playing recommended song: ${nextRecommendedSong!['title']}');
-        final recommendedSong = Map<String, dynamic>.from(nextRecommendedSong!);
-        nextRecommendedSong = null;
-
-        // Play the recommended song
-        await playSong(recommendedSong);
-      } else {
-        print('[AudioHandler] No recommended song found after waiting');
-      }
-    } catch (e, stackTrace) {
-      logger.log('Error in _handleAutoPlayNext', e, stackTrace);
-    } finally {
-      _isLoadingNextSong = false;
-      print('[AudioHandler] Auto-play process completed');
-    }
-  }
-
-  Future<void> _createAutoPlaylist(String seedSongId) async {
-    if (_isCreatingAutoPlaylist) {
-      print('[AudioHandler] Already creating auto-playlist, skipping');
-      return;
-    }
-
-    _isCreatingAutoPlaylist = true;
     print('[AudioHandler] Creating auto-playlist for seed song: $seedSongId');
 
     try {
       final List<Map> newSongs = [];
       String currentSeedId = seedSongId;
 
-      // Get 8-10 similar songs to create a proper playlist
       for (int i = 0; i < 8; i++) {
+        // Check if a new song has started playing, if so, cancel this task.
+        if (version != _autoPlaylistVersion) {
+          print('[AudioHandler] Auto-playlist creation cancelled for new song.');
+          return;
+        }
+
         try {
-          print('[AudioHandler] Getting similar song $i for: $currentSeedId');
+          print(
+              '[AudioHandler] Getting similar song ${i + 1} for: $currentSeedId');
 
-          // Clear previous recommendation
-          nextRecommendedSong = null;
+          Map<String, dynamic>? nextRecommendedSong;
 
-          // Get similar song
-          getSimilarSong(currentSeedId);
+          final excludeIds = _queueList.map((s) => s['ytid'] as String).toList()
+                           ..addAll(newSongs.map((s) => s['ytid'] as String));
 
-          // Wait for recommendation with shorter timeout
-          final maxWaitTime = DateTime.now().add(const Duration(seconds: 4));
-          while (nextRecommendedSong == null &&
-              DateTime.now().isBefore(maxWaitTime)) {
-            await Future.delayed(const Duration(milliseconds: 200));
+          // 1. Try to get a recommendation
+          final recommendations = await getNextRecommendedSongs(currentSeedId, count: 1, excludeIds: excludeIds)
+              .timeout(const Duration(seconds: 5), onTimeout: () => []);
+          if (recommendations.isNotEmpty) {
+            nextRecommendedSong = recommendations.first;
+          } else {
+            // 2. If no recommendation, get a fallback song
+            print(
+                '[AudioHandler] No recommendation for auto-playlist. Trying fallback...');
+            nextRecommendedSong = await getFallbackSong(excludeIds: excludeIds);
           }
 
           if (nextRecommendedSong != null) {
-            final similarSong = Map<String, dynamic>.from(nextRecommendedSong!);
-
-            // Check if song is not already in queue or new songs list
-            final isDuplicate =
-                _queueList.any((s) => s['ytid'] == similarSong['ytid']) ||
-                    newSongs.any((s) => s['ytid'] == similarSong['ytid']);
-
-            if (!isDuplicate) {
-              newSongs.add(similarSong);
-              print(
-                  '[AudioHandler] Added to auto-playlist: ${similarSong['title']}');
-
-              // Use this song as seed for next recommendation (chain effect)
-              currentSeedId = similarSong['ytid'];
-            } else {
-              print(
-                  '[AudioHandler] Skipping duplicate song: ${similarSong['title']}');
-            }
-
-            nextRecommendedSong = null;
+            final similarSong = Map<String, dynamic>.from(nextRecommendedSong);
+            newSongs.add(similarSong);
+            print(
+                '[AudioHandler] Added to auto-playlist: ${similarSong['title']}');
+            // Use this song as seed for next recommendation (chain effect)
+            currentSeedId = similarSong['ytid'];
           } else {
-            print('[AudioHandler] No similar song found for iteration $i');
+            print(
+                '[AudioHandler] No similar or fallback song found for iteration ${i + 1}');
+            break; // Stop if we can't find any more songs
           }
 
           // Small delay between requests to avoid rate limiting
           await Future.delayed(const Duration(milliseconds: 300));
         } catch (e) {
-          print('[AudioHandler] Error getting similar song $i: $e');
+          print('[AudioHandler] Error getting similar song ${i + 1}: $e');
           continue;
         }
       }
@@ -463,8 +408,6 @@ class J3TunesAudioHandler extends BaseAudioHandler {
       }
     } catch (e, stackTrace) {
       logger.log('Error creating auto-playlist', e, stackTrace);
-    } finally {
-      _isCreatingAutoPlaylist = false;
     }
   }
 
@@ -733,10 +676,8 @@ class J3TunesAudioHandler extends BaseAudioHandler {
       : null;
 
   bool get hasNext {
-    // Always show next button as enabled if auto-play is on or there are more songs in queue
-    return _currentQueueIndex < _queueList.length - 1 ||
-        playNextSongAutomatically.value ||
-        repeatNotifier.value != AudioServiceRepeatMode.none;
+    // Always true because we can always generate a next song.
+    return true;
   }
 
   bool get hasPrevious {
@@ -814,21 +755,18 @@ class J3TunesAudioHandler extends BaseAudioHandler {
         return false;
       }
 
+      // Cancel any previous auto-playlist creation task by incrementing the version.
+      _autoPlaylistVersion++;
+
       print('[AudioHandler] Playing song: ${song['title']} (${song['ytid']})');
 
-      // First add song to queue if not already present
-      final existingIndex =
-          _queueList.indexWhere((s) => s['ytid'] == song['ytid']);
-      if (existingIndex == -1) {
-        _queueList.add(song);
-        _currentQueueIndex = _queueList.length - 1;
-        print(
-            '[AudioHandler] Added song to queue. New queue length: ${_queueList.length}, Current index: $_currentQueueIndex');
-      } else {
-        _currentQueueIndex = existingIndex;
-        print(
-            '[AudioHandler] Song already in queue at index: $_currentQueueIndex');
-      }
+      // Clear the queue to enable radio/auto-play mode
+      _queueList.clear();
+      _queueList.add(song);
+      _currentQueueIndex = 0;
+
+      print(
+          '[AudioHandler] Queue cleared for radio mode. New queue length: ${_queueList.length}, Current index: $_currentQueueIndex');
 
       // Update UI immediately
       _updateQueueMediaItems();
@@ -840,13 +778,10 @@ class J3TunesAudioHandler extends BaseAudioHandler {
         _consecutiveErrors = 0;
         _preloadUpcomingSongs();
 
-        // Create auto-playlist immediately if auto-play is enabled and queue is small
-        if (playNextSongAutomatically.value && _queueList.length <= 2) {
-          print(
-              '[AudioHandler] Triggering auto-playlist creation for continuous playback');
-          // Don't wait, create playlist immediately in background
-          _createAutoPlaylist(song['ytid']);
-        }
+        // Create auto-playlist in the background for continuous playback
+        print(
+            '[AudioHandler] Triggering auto-playlist creation for continuous playback');
+        unawaited(_createAutoPlaylist(song['ytid'], _autoPlaylistVersion));
       }
 
       return success;
@@ -899,53 +834,67 @@ class J3TunesAudioHandler extends BaseAudioHandler {
   }
 
   Future<String?> _getSongUrl(Map song, bool isOffline) async {
+    final songId = song['ytid'] ?? song['videoId'];
+    if (songId == null) {
+      logger.log('Song ID is null for song: $song', null, null);
+      return null;
+    }
+
     if (isOffline) {
       return _getOfflineSongUrl(song);
     } else {
-      // Use new MusicServices API for online song
+      // 1. Check cache first for speed
+      final cacheKey = 'song_${songId}_${audioQualitySetting.value}_url';
+      final cachedUrl = await getData('cache', cacheKey);
+      if (cachedUrl != null && cachedUrl is String && cachedUrl.isNotEmpty) {
+        if (Uri.tryParse(cachedUrl)?.hasQuery ?? false) {
+          print('[AudioHandler] Using preloaded/cached URL for $songId');
+          unawaited(updateRecentlyPlayed(songId));
+          return cachedUrl;
+        }
+      }
+
+      // 2. If not in cache, fetch it
       try {
         final musicService = MusicServices();
-        final songId = song['ytid'] ?? song['videoId'];
-        if (songId == null) {
-          logger.log('Song ID is null for song: $song', null, null);
-          return null;
-        }
         final playlistData =
             await musicService.getWatchPlaylist(videoId: songId);
         logger.log(
             'getWatchPlaylist response for $songId: $playlistData', null, null);
-        if (playlistData != null && playlistData['tracks'].isNotEmpty) {
-          final track = playlistData['tracks'][0];
-          logger.log('Track info for $songId: $track', null, null);
-          // Try to get stream URL from track
-          final url = track['streamUrl'] ?? track['url'] ?? null;
-          logger.log('Fetched stream URL for $songId: $url', null, null);
-          if (url != null && url.isNotEmpty) {
-            return url;
+        final tracksRaw = playlistData?['tracks'];
+        if (tracksRaw is List && tracksRaw.isNotEmpty) {
+          final track = tracksRaw[0];
+          if (track is Map) {
+            final url = track['streamUrl'] ?? track['url'] ?? null;
+            logger.log('Fetched stream URL for $songId: $url', null, null);
+            if (url != null && url is String && url.isNotEmpty) {
+              await addOrUpdateData('cache', cacheKey, url);
+              unawaited(updateRecentlyPlayed(songId));
+              return url;
+            }
           }
-        } else {
-          logger.log('No tracks found in playlistData for $songId', null, null);
         }
         // Fallback to musify.dart getSong if MusicServices fails
         logger.log('Trying musify.getSong fallback for $songId', null, null);
         final fallbackUrl = await getSong(songId, song['isLive'] ?? false);
         logger.log('musify.getSong fallback URL for $songId: $fallbackUrl',
             null, null);
+        if (fallbackUrl != null && fallbackUrl.isNotEmpty) {
+          await addOrUpdateData('cache', cacheKey, fallbackUrl);
+        }
         return fallbackUrl;
-      } catch (e) {
+      } catch (e, stackTrace) {
         logger.log(
-            'Exception in _getSongUrl for song: $song, error: $e', null, null);
+            'Exception in _getSongUrl for song: $song, error: $e', e, stackTrace);
         // Fallback to musify.dart getSong if MusicServices throws error
-        final songId = song['ytid'] ?? song['videoId'];
         logger.log('Trying musify.getSong fallback after exception for $songId',
             null, null);
-        if (songId != null) {
-          final fallbackUrl = await getSong(songId, song['isLive'] ?? false);
-          logger.log('musify.getSong fallback URL for $songId: $fallbackUrl',
-              null, null);
-          return fallbackUrl;
+        final fallbackUrl = await getSong(songId, song['isLive'] ?? false);
+        logger.log('musify.getSong fallback URL for $songId: $fallbackUrl', null, null);
+        if (fallbackUrl != null && fallbackUrl.isNotEmpty) {
+          await addOrUpdateData('cache', cacheKey, fallbackUrl);
         }
-        return null;
+        return fallbackUrl;
       }
     }
   }
@@ -1015,10 +964,6 @@ class J3TunesAudioHandler extends BaseAudioHandler {
 
       _updatePlaybackState();
 
-      if (playNextSongAutomatically.value) {
-        getSimilarSong(song['ytid']);
-      }
-
       // Start preloading AFTER current song is playing to avoid blocking
       Future.delayed(const Duration(seconds: 2), _preloadUpcomingSongs);
 
@@ -1066,6 +1011,22 @@ class J3TunesAudioHandler extends BaseAudioHandler {
 
       _lastError = e.toString();
       return false;
+    }
+  }
+
+  Future<void> startRadio(Map song) async {
+    try {
+      // Stop current playback and clear queue
+      await stop();
+      clearQueue();
+
+      // Add the seed song and play it
+      await playSong(song);
+
+      // In the background, create a playlist from this song
+      unawaited(_createAutoPlaylist(song['ytid'], _autoPlaylistVersion));
+    } catch (e, stackTrace) {
+      logger.log('Error starting radio', e, stackTrace);
     }
   }
 
@@ -1161,13 +1122,10 @@ class J3TunesAudioHandler extends BaseAudioHandler {
         return;
       }
 
-      // Auto-play next song if enabled
-      if (playNextSongAutomatically.value) {
-        print('[AudioHandler] Auto-play next song');
-        await _handleAutoPlayNext();
-      } else {
-        print('[AudioHandler] No next song available');
-      }
+      // If we reach here, it means we are at the end of the queue.
+      // Time to auto-play a recommended song.
+      print('[AudioHandler] End of queue, auto-playing next song');
+      await _handleAutoPlayNext();
     } catch (e, stackTrace) {
       logger.log('Error skipping to next song', e, stackTrace);
     }
@@ -1291,15 +1249,6 @@ class J3TunesAudioHandler extends BaseAudioHandler {
     );
   }
 
-  void changeAutoPlayNextStatus() {
-    playNextSongAutomatically.value = !playNextSongAutomatically.value;
-    addOrUpdateData(
-      'settings',
-      'playNextSongAutomatically',
-      playNextSongAutomatically.value,
-    );
-  }
-
   @override
   Future<void> customAction(String name, [Map<String, dynamic>? extras]) async {
     try {
@@ -1312,6 +1261,13 @@ class J3TunesAudioHandler extends BaseAudioHandler {
             await addToQueue(
               extras!['song'] as Map,
               playNext: extras['playNext'] ?? false,
+            );
+          }
+          break;
+        case 'startRadio':
+          if (extras?['song'] != null) {
+            await startRadio(
+              extras!['song'] as Map,
             );
           }
           break;

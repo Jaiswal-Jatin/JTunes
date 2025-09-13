@@ -275,6 +275,11 @@ class _SongBarState extends State<SongBar> {
           duration: const Duration(seconds: 1),
         );
         break;
+      case 'start_radio':
+        audioHandler.customAction('startRadio', {'song': widget.song});
+        // Optionally navigate to now playing screen
+        // showNowPlayingPage(context);
+        break;
       case 'like':
         if (_songLikeStatus != null) {
           _songLikeStatus!.value = !_songLikeStatus!.value;
@@ -330,6 +335,16 @@ class _SongBarState extends State<SongBar> {
             Icon(FluentIcons.receipt_play_24_regular, color: primaryColor),
             const SizedBox(width: 8),
             Text(context.l10n!.playNext),
+          ],
+        ),
+      ),
+      PopupMenuItem<String>(
+        value: 'start_radio',
+        child: Row(
+          children: [
+            Icon(FluentIcons.radio_button_24_regular, color: primaryColor),
+            const SizedBox(width: 8),
+            const Text('Start Radio'),
           ],
         ),
       ),

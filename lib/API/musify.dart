@@ -137,8 +137,13 @@ Future<List> _getRecommendationsFromRecentlyPlayed() async {
   final futures = recent.map((songData) async {
     try {
       final song = await _yt.videos.get(songData['ytid']);
-      final relatedSongs = await _yt.videos.getRelatedVideos(song) ?? [];
-      return relatedSongs.take(3).map((s) => returnSongLayout(0, s)).toList();
+      final relatedVideos = await _yt.videos.getRelatedVideos(song) ?? [];
+      // Filter for song content and take the first few
+      final relatedSongs = relatedVideos
+          .where(isSongContent)
+          .take(3)
+          .map((s) => returnSongLayout(0, s));
+      return relatedSongs.toList();
     } catch (e, stackTrace) {
       logger.log(
         'Error getting related videos for ${songData['ytid']}',
@@ -586,16 +591,98 @@ Future<List<Map<String, int>>> getSkipSegments(String id) async {
   }
 }
 
-void getSimilarSong(String songYtId) async {
+bool _isTitleTooSimilar(String title1, String title2) {
+  // v5: More aggressive cleaning with camelCase splitting and Jaccard similarity
+  String cleanAndSplit(String title) {
+    return title
+        .replaceAllMapped(RegExp(r'([a-z])([A-Z])'), (m) => '${m[1]} ${m[2]}') // Split camelCase
+        .toLowerCase()
+        .replaceAll(RegExp(r'\(.*?\)|\[.*?\]|ft\.|feat\.'), ' ') // remove content in brackets and ft/feat
+        .replaceAll(RegExp(r'[^\w\s]'), ' ') // remove all punctuation
+        .replaceAll(RegExp(r'\b(official|video|audio|lyric|mv|hd|song)\b'), ' ') // remove common terms
+        .replaceAll(RegExp(r'\s+'), ' ') // collapse multiple spaces
+        .trim();
+  }
+
+  final clean1 = cleanAndSplit(title1);
+  final clean2 = cleanAndSplit(title2);
+
+  if (clean1.isEmpty || clean2.isEmpty) return false;
+
+  final words1 = clean1.split(' ').toSet();
+  final words2 = clean2.split(' ').toSet();
+
+  // Remove very short words that are likely noise
+  words1.removeWhere((word) => word.length < 2);
+  words2.removeWhere((word) => word.length < 2);
+
+  if (words1.isEmpty || words2.isEmpty) return false;
+
+  final intersection = words1.intersection(words2).length;
+  final union = words1.union(words2).length;
+  final jaccardSimilarity = union > 0 ? intersection / union : 0.0;
+
+  // If 70% or more of the words are the same, consider it a duplicate.
+  if (jaccardSimilarity > 0.7) {
+    logger.log('Found similar titles (Jaccard > 0.7): "$clean1" and "$clean2"', null, null);
+    return true;
+  }
+  return false;
+}
+
+/// Fetches a list of recommended songs based on the currently playing song.
+///
+/// Uses YouTube's related videos as a source for recommendations.
+/// Includes a fallback to search if no related videos are found.
+/// [songYtId] is the YouTube ID of the song to get recommendations for.
+/// [count] is the number of recommendations to return.
+Future<List<Map<String, dynamic>>> getNextRecommendedSongs(
+  String? songYtId, {
+  int count = 5,
+  List<String> excludeIds = const [],
+}) async {
+  if (songYtId == null || songYtId.isEmpty) return [];
+
   try {
     final song = await _yt.videos.get(songYtId);
-    final relatedSongs = await _yt.videos.getRelatedVideos(song) ?? [];
+    var relatedVideos = await _yt.videos.getRelatedVideos(song) ?? [];
 
-    if (relatedSongs.isNotEmpty) {
-      nextRecommendedSong = returnSongLayout(0, relatedSongs[0]);
+    // Fallback Strategy: If no related videos, search for the song title.
+    if (relatedVideos.isEmpty) {
+      logger.log(
+          'No related videos found for ${song.title}. Using search fallback.',
+          null,
+          null);
+      try {
+        var searchQuery =
+            '${song.title} ${song.author}'.replaceAll(RegExp(r'[^\w\s]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+        final searchResults = await _yt.search.search(searchQuery);
+        // Filter out the original song itself AND songs with very similar titles
+        relatedVideos = searchResults.where((video) {
+          final isExcluded = excludeIds.contains(video.id.value);
+          final isOriginal = video.id.value == songYtId;
+          final isTooSimilar = _isTitleTooSimilar(song.title, video.title);
+          return !isOriginal && !isTooSimilar && !isExcluded;
+        }).toList();
+      } catch (e) {
+        logger.log('Search fallback failed for ${song.title}: $e', null, null);
+        relatedVideos = [];
+      }
     }
+
+    final recommendations = <Map<String, dynamic>>[];
+    for (final video in relatedVideos) {
+      if (isSongContent(video) &&
+          !_isTitleTooSimilar(song.title, video.title) &&
+          !excludeIds.contains(video.id.value)) {
+        recommendations.add(returnSongLayout(0, video));
+        if (recommendations.length >= count) break;
+      }
+    }
+    return recommendations;
   } catch (e, stackTrace) {
-    logger.log('Error while fetching next similar song:', e, stackTrace);
+    logger.log('Error while fetching next recommended songs:', e, stackTrace);
+    return [];
   }
 }
 
@@ -1237,46 +1324,53 @@ Future<List<Map<String, dynamic>>> search(String query, String type) async {
 
 // API me ek global filter function add karo
 bool isSongContent(dynamic video) {
-  if (video == null) return false;
-
-  final title = video.title?.toLowerCase() ?? '';
-  final author = video.author?.toLowerCase() ?? '';
+  if (video is! Video) return false;
+  final title = video.title.toLowerCase();
+  final author = video.author.toLowerCase();
   final duration = video.duration?.inSeconds ?? 0;
 
-  // Negative filters (remove these)
-  final negativeKeywords = [
-    'news',
-    'breaking',
-    'live',
-    'debate',
-    'interview',
-    'podcast',
-    'talk show',
-    'tv show',
-    'documentary',
-    'trailer',
-    'movie',
-    'film',
-    'review',
-    'reaction',
-    'gaming',
-    'gameplay',
-    'tutorial',
-    'vlog'
+  // 1. Basic duration filter: songs are usually between 1:15 and 12 minutes
+  if (duration < 75 || duration > 720) {
+    return false;
+  }
+
+  // 2. Negative keyword filter: remove non-music content
+  const negativeKeywords = [
+    // Common non-music tags
+    '#shorts', '#short', 'vlog', 'tutorial', 'review', 'reaction', 'unboxing',
+    'gameplay', 'gaming', 'podcast', 'interview', 'news', 'breaking', 'live',
+    'debate', 'talk show', 'tv show', 'documentary', 'trailer', 'movie',
+    'film', 'how to', 'diy', 'comedy', 'stand up', 'prank',
+
+    // Specific keywords from logs
+    'doctor', 'treatment', 'health', 'fitness', 'injury', 'pain', 'cervical',
+    'chiropractic', 'medical', 'therapy',
+
+    // Other common non-song words
+    'episode', 'highlights', 'full match', 'asmr', 'audiobook'
   ];
+  if (negativeKeywords.any((keyword) => title.contains(keyword) || author.contains(keyword))) {
+    return false;
+  }
 
-  final hasNegativeKeyword = negativeKeywords
-      .any((keyword) => title.contains(keyword) || author.contains(keyword));
+  // 3. Positive keyword filter: high confidence it's a song
+  const positiveKeywords = [
+    'official video', 'official music video', 'lyric video', 'audio', 'song',
+    'full song', 'official song', '(hd)', 'music'
+  ];
+  if (positiveKeywords.any((keyword) => title.contains(keyword))) {
+    return true;
+  }
 
-  // Positive filters (keep these) - YE CHANGE KIYA HAI
-  final isValidDuration = duration > 30 && duration <= 360; // 30 sec to 6 min
-  final hasAudioIndicators = title.contains('audio') ||
-      title.contains('song') ||
-      title.contains('music') ||
-      author.contains('music') ||
-      author.contains('records');
+  // 4. Author filter: channels that usually post music
+  const musicChannels = ['vevo', 't-series', 'topic', 'records', 'music', 'sonymusic'];
+  if (musicChannels.any((channel) => author.contains(channel))) {
+    return true;
+  }
 
-  return !hasNegativeKeyword && isValidDuration;
+  // 5. If no strong signals, be strict and return false.
+  // If it passed all negative checks, we can consider it a potential song.
+  return true;
 }
 
 
@@ -1301,6 +1395,71 @@ Future<Map<String, dynamic>?> getPlaylistInfoHead(String playlistId) async {
   };
 }
 
+/// Provides a fallback song if recommendations fail.
+///
+/// Tries to get a random song from:
+/// 1. User's Liked Songs
+/// 2. User's Recently Played Songs
+/// 3. A global default playlist
+Future<Map<String, dynamic>?> getFallbackSong({List<String> excludeIds = const []}) async {
+  try {
+    final random = Random();
+
+    // Helper to get a random song from a list, excluding certain IDs
+    Map<String, dynamic>? getRandomSongFromList(List sourceList) {
+      if (sourceList.isEmpty) return null;
+      
+      final eligibleSongs = sourceList
+          .where((song) => !excludeIds.contains(song['ytid']))
+          .toList();
+
+      if (eligibleSongs.isEmpty) return null;
+
+      return Map<String, dynamic>.from(eligibleSongs[random.nextInt(eligibleSongs.length)]);
+    }
+
+    // Strategy 1: Random song from Liked Songs
+    var fallbackSong = getRandomSongFromList(userLikedSongsList);
+    if (fallbackSong != null) {
+      logger.log('Fallback: Found song from Liked Songs.', null, null);
+      return fallbackSong;
+    }
+
+    // Strategy 2: Random song from Recently Played
+    fallbackSong = getRandomSongFromList(userRecentlyPlayed);
+    if (fallbackSong != null) {
+      logger.log('Fallback: Found song from Recently Played.', null, null);
+      return fallbackSong;
+    }
+
+    // Strategy 3: Random song from a default INDIAN playlist
+    const indianPlaylistId = 'PLrAl-OP1_0Dt5cLz4dEJsRdOb1Uz5YuL4'; // Top 50 Indian Songs
+    final indianSongs = await getSongsFromPlaylist(indianPlaylistId);
+    fallbackSong = getRandomSongFromList(indianSongs);
+    if (fallbackSong != null) {
+      logger.log('Fallback: Found song from Indian Playlist.', null, null);
+      return fallbackSong;
+    }
+
+    // Strategy 4: Random song from a default global playlist
+    const globalPlaylistId = 'PLgzTt0k8mXzEk586ze4BjvDXR7c-TUSnx';
+    final globalSongs = await getSongsFromPlaylist(globalPlaylistId);
+    fallbackSong = getRandomSongFromList(globalSongs);
+    if (fallbackSong != null) {
+      logger.log('Fallback: Found song from generic Global Playlist.', null, null);
+      return fallbackSong;
+    }
+
+    logger.log('Fallback: No fallback song found after checking all sources.', null, null);
+
+  } catch (e, stackTrace) {
+    logger.log('Error getting fallback song', e, stackTrace);
+  }
+
+  // If all fallbacks fail
+  return null;
+}
+
 Future<void> addOrUpdateData(String group, String key, dynamic value) async {
   final prefs = await SharedPreferences.getInstance();
   if (value is String) {
@@ -1313,17 +1472,34 @@ Future<void> addOrUpdateData(String group, String key, dynamic value) async {
     await prefs.setBool('$group-$key', value);
   } else if (value is List<String>) {
     await prefs.setStringList('$group-$key', value);
-  } else if (value is Map<String, dynamic>) {
-    // Convert Map to String before saving
-    await prefs.setString('$group-$key', value.toString());
+  } else if (value is List || value is Map) {
+    try {
+      await prefs.setString('$group-$key', json.encode(value));
+    } catch (e, stackTrace) {
+      logger.log(
+          'Error encoding data for caching: ${value.runtimeType}', e, stackTrace);
+    }
   } else {
-    logger.log('Unsupported data type for caching: ${value.runtimeType}', null, null);
+    logger.log(
+        'Unsupported data type for caching: ${value.runtimeType}', null, null);
   }
 }
 
 Future<dynamic> getData(String group, String key) async {
   final prefs = await SharedPreferences.getInstance();
-  return prefs.get('$group-$key');
+  final value = prefs.get('$group-$key');
+
+  if (value is String) {
+    try {
+      // Try to decode if it's a JSON string (for Lists and Maps)
+      return json.decode(value);
+    } catch (e) {
+      // Not a JSON string, return as is
+      return value;
+    }
+  }
+
+  return value;
 }
 
 Future<Map<String, dynamic>?> getPlaylistInfoForWidgetCached(String playlistId) async {

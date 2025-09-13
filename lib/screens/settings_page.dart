@@ -202,6 +202,8 @@ class _SettingsPageState extends State<SettingsPage> {
     Color inactivatedColor,
     Color primaryColor,
   ) {
+    // The 'Online Features' section is now just the tools section.
+    // Other options were removed as per user request or for simplification.
     return Column(
       children: [
         // ValueListenableBuilder<bool>(
@@ -217,22 +219,6 @@ class _SettingsPageState extends State<SettingsPage> {
         //     );
         //   },
         // ),
-        ValueListenableBuilder<bool>(
-          valueListenable: playNextSongAutomatically,
-          builder: (_, value, __) {
-            return CustomBar(
-              context.l10n!.automaticSongPicker,
-              FluentIcons.music_note_2_play_20_filled,
-              trailing: Switch(
-                value: value,
-                onChanged: (value) {
-                  audioHandler.changeAutoPlayNextStatus();
-                  showToast(context, context.l10n!.settingChangedMsg);
-                },
-              ),
-            );
-          },
-        ),
         // ValueListenableBuilder<bool>(
         //   valueListenable: defaultRecommendations,
         //   builder: (_, value, __) {

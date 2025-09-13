@@ -25,6 +25,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:j3tunes/services/router_service.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -41,7 +42,6 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _pulseController;
 
   late Animation<double> _logoScale;
-  late Animation<double> _logoRotation;
   late Animation<double> _textFade;
   late Animation<Offset> _textSlide;
   late Animation<double> _particleAnimation;
@@ -72,12 +72,6 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
-    _logoRotation = Tween<double>(begin: 0.0, end: 2 * pi).animate(
-      CurvedAnimation(
-        parent: _logoController,
-        curve: Curves.easeInOut,
-      ),
-    );
 
     // Text animations
     _textController = AnimationController(
@@ -182,8 +176,7 @@ class _SplashScreenState extends State<SplashScreen>
             colors: [
               Theme.of(context).colorScheme.primary.withOpacity(0.8),
               Theme.of(context).colorScheme.secondary.withOpacity(0.6),
-              Theme.of(context).colorScheme.tertiary?.withOpacity(0.4) ??
-                  Theme.of(context).colorScheme.primary.withOpacity(0.4),
+              Theme.of(context).colorScheme.tertiary.withOpacity(0.4),
             ],
           ),
         ),
@@ -215,39 +208,36 @@ class _SplashScreenState extends State<SplashScreen>
                     builder: (context, child) {
                       return Transform.scale(
                         scale: _logoScale.value * _pulseAnimation.value,
-                        child: Transform.rotate(
-                          angle: _logoRotation.value * 0.1, // Subtle rotation
-                          child: Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Colors.white,
-                                  Colors.white.withOpacity(0.8),
-                                ],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.3),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 10),
-                                ),
-                                BoxShadow(
-                                  color: Colors.white.withOpacity(0.5),
-                                  blurRadius: 15,
-                                  offset: const Offset(0, -5),
-                                ),
+                        child: Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.white,
+                                Colors.white.withOpacity(0.8),
                               ],
                             ),
-                            child: const Icon(
-                              Icons.music_note,
-                              size: 60,
-                              color: Color(0xFF6366F1), // Indigo color
-                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
+                              ),
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.5),
+                                blurRadius: 15,
+                                offset: const Offset(0, -5),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.music_note,
+                            size: 60,
+                            color: Color(0xFF6366F1), // Indigo color
                           ),
                         ),
                       );
@@ -281,117 +271,117 @@ class _SplashScreenState extends State<SplashScreen>
                   const SizedBox(height: 16),
 
                   // Features text with animation
-                  SlideTransition(
-                    position: _textSlide,
-                    child: FadeTransition(
-                      opacity: _textFade,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(25),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.audiotrack,
-                              color: Colors.white.withOpacity(0.9),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Audio',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Container(
-                              width: 1,
-                              height: 20,
-                              color: Colors.white.withOpacity(0.3),
-                            ),
-                            const SizedBox(width: 16),
-                            Icon(
-                              Icons.videocam,
-                              color: Colors.white.withOpacity(0.9),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Video',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+            //       SlideTransition(
+            //         position: _textSlide,
+            //         child: FadeTransition(
+            //           opacity: _textFade,
+            //           child: Container(
+            //             padding: const EdgeInsets.symmetric(
+            //               horizontal: 24,
+            //               vertical: 12,
+            //             ),
+            //             decoration: BoxDecoration(
+            //               color: Colors.white.withOpacity(0.1),
+            //               borderRadius: BorderRadius.circular(25),
+            //               border: Border.all(
+            //                 color: Colors.white.withOpacity(0.2),
+            //                 width: 1,
+            //               ),
+            //             ),
+            //             child: Row(
+            //               mainAxisSize: MainAxisSize.min,
+            //               children: [
+            //                 Icon(
+            //                   Icons.audiotrack,
+            //                   color: Colors.white.withOpacity(0.9),
+            //                   size: 20,
+            //                 ),
+            //                 const SizedBox(width: 8),
+            //                 const Text(
+            //                   'Audio',
+            //                   style: TextStyle(
+            //                     color: Colors.white,
+            //                     fontSize: 16,
+            //                     fontWeight: FontWeight.w600,
+            //                   ),
+            //                 ),
+            //                 const SizedBox(width: 16),
+            //                 Container(
+            //                   width: 1,
+            //                   height: 20,
+            //                   color: Colors.white.withOpacity(0.3),
+            //                 ),
+            //                 const SizedBox(width: 16),
+            //                 Icon(
+            //                   Icons.videocam,
+            //                   color: Colors.white.withOpacity(0.9),
+            //                   size: 20,
+            //                 ),
+            //                 const SizedBox(width: 8),
+            //                 const Text(
+            //                   'Video',
+            //                   style: TextStyle(
+            //                     color: Colors.white,
+            //                     fontSize: 16,
+            //                     fontWeight: FontWeight.w600,
+            //                   ),
+            //                 ),
+            //               ],
+            //             ),
+            //           ),
+            //         ),
+            //       ),
 
-                  const SizedBox(height: 60),
+            //       const SizedBox(height: 60),
 
-                  // Creator credit with animation
-                  SlideTransition(
-                    position: _textSlide,
-                    child: FadeTransition(
-                      opacity: _textFade,
-                      child: Column(
-                        children: [
-                          Text(
-                            'Created by',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.white.withOpacity(0.15),
-                                  Colors.white.withOpacity(0.05),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.2),
-                                width: 1,
-                              ),
-                            ),
-                            child: const Text(
-                              'Jatin Jaiswal',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+            //       // Creator credit with animation
+            //       SlideTransition(
+            //         position: _textSlide,
+            //         child: FadeTransition(
+            //           opacity: _textFade,
+            //           child: Column(
+            //             children: [
+            //               Text(
+            //                 'Created by',
+            //                 style: TextStyle(
+            //                   color: Colors.white.withOpacity(0.7),
+            //                   fontSize: 14,
+            //                   fontWeight: FontWeight.w400,
+            //                 ),
+            //               ),
+            //               const SizedBox(height: 8),
+            //               Container(
+            //                 padding: const EdgeInsets.symmetric(
+            //                   horizontal: 20,
+            //                   vertical: 10,
+            //                 ),
+            //                 decoration: BoxDecoration(
+            //                   gradient: LinearGradient(
+            //                     colors: [
+            //                       Colors.white.withOpacity(0.15),
+            //                       Colors.white.withOpacity(0.05),
+            //                     ],
+            //                   ),
+            //                   borderRadius: BorderRadius.circular(20),
+            //                   border: Border.all(
+            //                     color: Colors.white.withOpacity(0.2),
+            //                     width: 1,
+            //                   ),
+            //                 ),
+            //                 child: const Text(
+            //                   'Jatin Jaiswal',
+            //                   style: TextStyle(
+            //                     color: Colors.white,
+            //                     fontSize: 18,
+            //                     fontWeight: FontWeight.bold,
+            //                     letterSpacing: 1,
+            //                   ),
+            //                 ),
+            //               ),
+            //             ],
+            //           ),
+            //         ),
+            //       ),
                 ],
               ),
             ),
@@ -406,13 +396,11 @@ class _SplashScreenState extends State<SplashScreen>
                 child: Column(
                   children: [
                     SizedBox(
-                      width: 30,
-                      height: 30,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.white.withOpacity(0.8),
-                        ),
+                      width: 40,
+                      height: 40,
+                      child: SpinKitFadingCircle(
+                        color: Colors.white.withOpacity(0.85),
+                        size: 40,
                       ),
                     ),
                     const SizedBox(height: 16),

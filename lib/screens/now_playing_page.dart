@@ -1,5 +1,6 @@
-// ignore_for_file: avoid_redundant_argument_values
+// ignore_for_file: avoid_redundant_argument_values, prefer_const_constructors
 
+import 'package:j3tunes/screens/equalizer_sheet.dart';
 import 'package:j3tunes/widgets/song_bar.dart';
 import 'package:j3tunes/widgets/spinner.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
@@ -13,6 +14,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_flip_card/flutter_flip_card.dart';
 import 'package:j3tunes/extensions/l10n.dart';
 import 'package:palette_generator/palette_generator.dart';
+import 'package:j3tunes/screens/artist_page.dart';
+
 import 'package:j3tunes/main.dart';
 import 'package:j3tunes/models/position_data.dart';
 import 'package:j3tunes/services/settings_manager.dart';
@@ -1077,11 +1080,25 @@ class NowPlayingControls extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 if (metadata.artist != null)
-                  MarqueeTextWidget(
-                    text: metadata.artist!,
-                    fontColor: Colors.white.withOpacity(0.8),
-                    fontSize: screenHeight * 0.017,
-                    fontWeight: FontWeight.w500,
+                  GestureDetector(
+                    onTap: () {
+                      if (metadata.artist != null && metadata.artist!.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ArtistPage(
+                              artistName: metadata.artist!,
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    child: MarqueeTextWidget(
+                      text: metadata.artist!,
+                      fontColor: Colors.white.withOpacity(0.8),
+                      fontSize: screenHeight * 0.017,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
               ],
             ),
@@ -1597,6 +1614,7 @@ class BottomActionsRow extends StatelessWidget {
         if (!offlineMode.value) _buildAddToPlaylistButton(_primaryColor),
         if (activePlaylist['list'].isNotEmpty && !isLargeScreen)
           _buildQueueButton(context, _primaryColor),
+        _buildEqualizerButton(context, _primaryColor),
         if (!offlineMode.value) ...[
           _buildSleepTimerButton(context, _primaryColor),
           _buildLikeButton(songLikeStatus, _primaryColor),
@@ -1693,6 +1711,22 @@ class BottomActionsRow extends StatelessWidget {
               },
             ),
           );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEqualizerButton(BuildContext context, Color primaryColor) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: Icon(FluentIcons.options_24_filled, color: primaryColor),
+        iconSize: iconSize,
+        onPressed: () {
+          showEqualizerSheet(context);
         },
       ),
     );

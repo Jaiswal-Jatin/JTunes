@@ -320,13 +320,17 @@ class MusicServices extends getx.GetxService {
         'content',
         'playlistPanelRenderer'
       ]));
-      playlist = results['contents']
-          .map((content) => nav(content,
-              ['playlistPanelVideoRenderer', ...navigation_playlist_id]))
-          .where((e) => e != null)
-          .toList()
-          .first;
-      tracks.addAll(parseWatchPlaylist(results['contents']));
+      final contents = results['contents'];
+      if (contents != null && contents is List && contents.isNotEmpty) {
+        playlist = contents
+            .map((content) => nav(
+                content, ['playlistPanelVideoRenderer', ...navigation_playlist_id]))
+            .firstWhere((e) => e != null, orElse: () => null);
+        tracks.addAll(parseWatchPlaylist(contents));
+      } else {
+        // Handle case where contents are null or empty
+        printINFO("No 'contents' found in getWatchPlaylist response for videoId: $videoId");
+      }
     }
 
     dynamic additionalParamsForNext;
