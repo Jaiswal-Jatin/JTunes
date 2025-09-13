@@ -1325,31 +1325,8 @@ Future<List<Map<String, dynamic>>> search(String query, String type) async {
     if (type == 'song') {
       final List<Video> searchResults = await _yt.search.search(query);
 
-      // Filter only music/songs, remove news/other content
-      final filteredResults = searchResults.where((video) {
-        final title = video.title.toLowerCase();
-        final author = video.author.toLowerCase();
-        final duration = video.duration?.inSeconds ?? 0;
-
-        // Filter conditions for songs only
-        return duration > 30 && // Minimum 30 seconds
-            duration <=
-                360 && // Maximum 6 minutes (360 seconds) - YE CHANGE KIYA HAI
-            !title.contains('news') &&
-            !title.contains('breaking') &&
-            !title.contains('live') &&
-            !title.contains('debate') &&
-            !title.contains('interview') &&
-            !title.contains('podcast') &&
-            !author.contains('news') &&
-            !author.contains('tv') &&
-            !author.contains('channel') &&
-            !title.contains('trailer') &&
-            !title.contains('movie') &&
-            !title.contains('film') &&
-            !title.contains('review') &&
-            !title.contains('reaction');
-      }).toList();
+      // Use the global isSongContent filter to remove shorts and other non-music content
+      final filteredResults = searchResults.where(isSongContent).toList();
 
       return filteredResults
           .map((video) => returnSongLayout(0, video))
