@@ -2,6 +2,8 @@
 
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:j3tunes/services/youtube_service.dart';
+import 'package:j3tunes/API/musify.dart';
+import 'package:audio_service/audio_service.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:j3tunes/services/data_manager.dart';
 import 'package:flutter/material.dart';
@@ -127,6 +129,7 @@ class _HomePageState extends State<HomePage>
   @override
   bool get wantKeepAlive => true;
 
+  Future<List<dynamic>>? _suggestedSongsFuture;
   // Cache futures to avoid repeated API calls
   Future<List<dynamic>>? _suggestedPlaylistsFuture;
   Future<List<dynamic>>? _likedPlaylistsFuture;
@@ -146,6 +149,20 @@ class _HomePageState extends State<HomePage>
   void initState() {
     super.initState();
     _initializeFutures();
+    audioHandler.mediaItem.listen(_onMediaItemChanged);
+    _onMediaItemChanged(audioHandler.mediaItem.value);
+  }
+
+  void _onMediaItemChanged(MediaItem? mediaItem) {
+    if (!mounted) return;
+    final songId = mediaItem?.extras?['ytid'] as String?;
+    if (songId != null && songId.isNotEmpty) {
+      if (mounted) {
+        setState(() {
+          _suggestedSongsFuture = getNextRecommendedSongs(songId, count: 15);
+        });
+      }
+    }
   }
 
   void _initializeFutures() {
@@ -363,7 +380,7 @@ class _HomePageState extends State<HomePage>
 
     final isLoading = _suggestedPlaylistsFuture == null ||
         _recentlyPlayedFuture == null ||
-        _trendingSongsFuture == null ||
+        (_suggestedSongsFuture == null && _trendingSongsFuture == null) ||
         _popSongsFuture == null ||
         _rockSongsFuture == null ||
         _bollywoodSongsFuture == null ||
@@ -388,8 +405,8 @@ class _HomePageState extends State<HomePage>
                     children: [
                       HomeHeaderShimmer(),
                       HomePlaylistSectionShimmer(title: 'Suggested Playlists'),
-                      _HomeRecentsSectionShimmer(),
-                      HomeSongSectionShimmer(title: 'Trending Songs'),
+                      const _HomeRecentsSectionShimmer(),
+                      const HomeSongSectionShimmer(title: 'Songs for You'),
                       HomeSongSectionShimmer(title: 'Bollywood Songs'),
                       HomeSongSectionShimmer(title: 'Punjabi Songs'),
                       HomeSongSectionShimmer(title: 'Marathi Songs'),
@@ -864,9 +881,9 @@ class _HomePageState extends State<HomePage>
   List<Widget> _buildSongSections() {
     final sections = [
       {
-        'title': 'Trending Songs',
-        'future': _trendingSongsFuture,
-        'key': 'trending_song'
+        'title': 'Songs for You',
+        'future': _suggestedSongsFuture ?? _trendingSongsFuture,
+        'key': 'suggested_song'
       },
       {
         'title': 'Bollywood Songs',
@@ -913,6 +930,7 @@ class _HomePageState extends State<HomePage>
   Future<void> _refreshContent() async {
     setState(() {
       _suggestedPlaylistsFuture = null;
+      _suggestedSongsFuture = null;
       _recentlyPlayedFuture = getRecents();
       _likedPlaylistsFuture = null;
       _trendingSongsFuture = null;
@@ -929,6 +947,7 @@ class _HomePageState extends State<HomePage>
 
     await Future.delayed(const Duration(milliseconds: 300));
     _initializeFutures();
+    _onMediaItemChanged(audioHandler.mediaItem.value);
   }
 
   Widget _buildLoadingWidget() {

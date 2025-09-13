@@ -638,51 +638,98 @@ bool _isTitleTooSimilar(String title1, String title2) {
 /// [count] is the number of recommendations to return.
 Future<List<Map<String, dynamic>>> getNextRecommendedSongs(
   String? songYtId, {
-  int count = 5,
+  int count = 15,
   List<String> excludeIds = const [],
 }) async {
   if (songYtId == null || songYtId.isEmpty) return [];
 
   try {
     final song = await _yt.videos.get(songYtId);
-    var relatedVideos = await _yt.videos.getRelatedVideos(song) ?? [];
+    final title = song.title.toLowerCase();
+    final author = song.author.toLowerCase();
+    final combinedText = '$title $author';
 
-    // Fallback Strategy: If no related videos, search for the song title.
-    if (relatedVideos.isEmpty) {
-      logger.log(
-          'No related videos found for ${song.title}. Using search fallback.',
-          null,
-          null);
-      try {
-        var searchQuery =
-            '${song.title} ${song.author}'.replaceAll(RegExp(r'[^\w\s]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
-        final searchResults = await _yt.search.search(searchQuery);
-        // Filter out the original song itself AND songs with very similar titles
-        relatedVideos = searchResults.where((video) {
-          final isExcluded = excludeIds.contains(video.id.value);
-          final isOriginal = video.id.value == songYtId;
-          final isTooSimilar = _isTitleTooSimilar(song.title, video.title);
-          return !isOriginal && !isTooSimilar && !isExcluded;
-        }).toList();
-      } catch (e) {
-        logger.log('Search fallback failed for ${song.title}: $e', null, null);
-        relatedVideos = [];
+    String detectedLanguage = 'mix'; // Default to mix
+
+    // Language detection logic
+    const languageKeywords = {
+      'hindi': [
+        'hindi', 'bollywood', 'sufi', 'ghazal', 'arijit', 'shreya',
+        'neha kakkar', 'jubin nautiyal', 'lata mangeshkar', 'kishore kumar',
+        'sonu nigam'
+      ],
+      'punjabi': [
+        'punjabi', 'diljit', 'sidhu', 'moosewala', 'karan aujla',
+        'gurdas maan', 'sunanda sharma'
+      ],
+      'marathi': ['marathi', 'ajay-atul', 'maharashtra', 'kolhapuri'],
+      'tamil': [
+        'tamil', 'anirudh', 'rahman', 'harris jayaraj', 'spb', 'chitra'
+      ],
+      'telugu': ['telugu', 'dsp', 'thaman s', 'keeravani', 'sid sriram'],
+      'kpop': [
+        'k-pop', 'kpop', 'bts', 'blackpink', 'twice', 'exo', 'stray kids'
+      ],
+    };
+
+    for (final entry in languageKeywords.entries) {
+      if (entry.value.any((keyword) => combinedText.contains(keyword))) {
+        detectedLanguage = entry.key;
+        break;
       }
     }
 
-    final recommendations = <Map<String, dynamic>>[];
-    for (final video in relatedVideos) {
-      if (isSongContent(video) &&
-          !_isTitleTooSimilar(song.title, video.title) &&
-          !excludeIds.contains(video.id.value)) {
-        recommendations.add(returnSongLayout(0, video));
-        if (recommendations.length >= count) break;
-      }
+    // Create search query based on language
+    String searchQuery;
+    switch (detectedLanguage) {
+      case 'hindi':
+        searchQuery = 'latest bollywood songs';
+        break;
+      case 'punjabi':
+        searchQuery = 'top punjabi hits';
+        break;
+      case 'marathi':
+        searchQuery = 'new marathi songs';
+        break;
+      case 'tamil':
+        searchQuery = 'trending tamil songs';
+        break;
+      case 'telugu':
+        searchQuery = 'latest telugu songs';
+        break;
+      case 'kpop':
+        searchQuery = 'k-pop top hits';
+        break;
+      default: // mix
+        searchQuery = '${song.author} songs';
     }
+
+    final searchResults = await _yt.search.search(searchQuery);
+
+    final recommendations = searchResults
+        .where((video) =>
+            video.id.value != songYtId &&
+            isSongContent(video) &&
+            !excludeIds.contains(video.id.value) &&
+            !_isTitleTooSimilar(song.title, video.title))
+        .map((video) => returnSongLayout(0, video))
+        .take(count)
+        .toList();
+
     return recommendations;
   } catch (e, stackTrace) {
     logger.log('Error while fetching next recommended songs:', e, stackTrace);
-    return [];
+    // Fallback to a default popular playlist on error
+    try {
+      final fallbackSongs =
+          await getSongsFromPlaylist('PLgzTt0k8mXzEk586ze4BjvDXR7c-TUSnx');
+      return fallbackSongs
+          .cast<Map<String, dynamic>>()
+          .take(count)
+          .toList(); // Top 50 Global
+    } catch (_) {
+      return [];
+    }
   }
 }
 
