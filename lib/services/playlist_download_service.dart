@@ -27,8 +27,8 @@ import 'dart:collection';
 import 'package:j3tunes/API/musify.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
+import 'package:j3tunes/main.dart';
 import 'package:j3tunes/extensions/l10n.dart';
-import 'package:j3tunes/main.dart' hide logger;
 import 'package:j3tunes/services/data_manager.dart' hide addOrUpdateData;
 import 'package:j3tunes/utilities/flutter_toast.dart';
 

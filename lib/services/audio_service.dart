@@ -29,7 +29,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:j3tunes/screens/equalizer_service.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:j3tunes/main.dart' hide logger;
+import 'package:j3tunes/main.dart';
 import 'package:j3tunes/models/position_data.dart';
 import 'package:j3tunes/services/data_manager.dart' hide addOrUpdateData, getData;
 import 'package:j3tunes/services/settings_manager.dart';

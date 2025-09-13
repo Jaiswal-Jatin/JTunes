@@ -24,6 +24,7 @@
 import 'package:j3tunes/API/musify.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:j3tunes/main.dart';
 import 'package:j3tunes/extensions/l10n.dart';
 import 'package:j3tunes/services/playlist_download_service.dart';
 import 'package:j3tunes/services/router_service.dart';

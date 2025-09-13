@@ -139,6 +139,7 @@ class _HomePageState extends State<HomePage>
   Future<dynamic>? _teluguSongsFuture;
   Future<dynamic>? _tamilSongsFuture;
   Future<dynamic>? _kpopSongsFuture;
+  Future<List<dynamic>>? _recentlyPlayedFuture;
   Future<dynamic>? _internationalSongsFuture;
 
   @override
@@ -257,6 +258,7 @@ class _HomePageState extends State<HomePage>
     });
 
     // Initialize song futures with staggered delays
+    _recentlyPlayedFuture = getRecents();
     _initializeSongFutures();
   }
 
@@ -360,6 +362,7 @@ class _HomePageState extends State<HomePage>
     final playlistHeight = (screenHeight * 0.22).clamp(160.0, 200.0);
 
     final isLoading = _suggestedPlaylistsFuture == null ||
+        _recentlyPlayedFuture == null ||
         _trendingSongsFuture == null ||
         _popSongsFuture == null ||
         _rockSongsFuture == null ||
@@ -385,6 +388,7 @@ class _HomePageState extends State<HomePage>
                     children: [
                       HomeHeaderShimmer(),
                       HomePlaylistSectionShimmer(title: 'Suggested Playlists'),
+                      _HomeRecentsSectionShimmer(),
                       HomeSongSectionShimmer(title: 'Trending Songs'),
                       HomeSongSectionShimmer(title: 'Bollywood Songs'),
                       HomeSongSectionShimmer(title: 'Punjabi Songs'),
@@ -407,6 +411,11 @@ class _HomePageState extends State<HomePage>
                       // Playlist Section with improved UI
                       RepaintBoundary(
                         child: _buildSuggestedPlaylists(playlistHeight),
+                      ),
+
+                      // Recently Played Section
+                      RepaintBoundary(
+                        child: _buildRecentlyPlayedSection(),
                       ),
 
                       // Song sections with reduced spacing
@@ -475,16 +484,6 @@ class _HomePageState extends State<HomePage>
           const SizedBox(height: 6),
           Row(
             children: [
-              Expanded(
-                child: _buildQuickAccessButton(
-                  'Recently played',
-                  Icons.history,
-                  () {
-                    NavigationManager.router.push('/library/userSongs/recents');
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
               Expanded(
                 child: _buildQuickAccessButton(
                   'Suggested Songs',
@@ -562,6 +561,83 @@ class _HomePageState extends State<HomePage>
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentlyPlayedSection() {
+    return FutureBuilder<List<dynamic>>(
+      future: _recentlyPlayedFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting ||
+            !snapshot.hasData ||
+            snapshot.data!.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final recentSongs =
+            snapshot.data!.map((e) => safeMapConvert(e)).toList();
+        if (recentSongs.isEmpty) return const SizedBox.shrink();
+
+        // Take 6 songs for a 3x2 grid
+        final songsToShow = recentSongs.take(6).toList();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionHeader('Recently Played', onSeeAll: () {
+              NavigationManager.router.push('/library/userSongs/recents');
+            }),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: songsToShow.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  mainAxisExtent: 52,
+                ),
+                itemBuilder: (context, index) {
+                  final song = songsToShow[index];
+                  return _buildRecentSongGridItem(song);
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildRecentSongGridItem(Map<String, dynamic> song) {
+    final imageUrl =
+        song['image'] ?? song['lowResImage'] ?? 'assets/images/JTunes.png';
+
+    return GestureDetector(
+      onTap: () => audioHandler.playSong(song),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 52,
+              height: 52,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.all(Radius.circular(4)),
+                child: _buildImageWidget(imageUrl),
+              ),
+            ),
+            const SizedBox(width: 10),
+            _buildTitleWidget(song['title'] ?? 'Unknown Title'),
           ],
         ),
       ),
@@ -837,6 +913,7 @@ class _HomePageState extends State<HomePage>
   Future<void> _refreshContent() async {
     setState(() {
       _suggestedPlaylistsFuture = null;
+      _recentlyPlayedFuture = getRecents();
       _likedPlaylistsFuture = null;
       _trendingSongsFuture = null;
       _kpopSongsFuture = null;
@@ -1171,4 +1248,65 @@ class _HomePageState extends State<HomePage>
   // NEW METHOD - First 4 songs ka combined image banane ke liye
 
   // Helper method for individual grid images
+}
+
+class _HomeRecentsSectionShimmer extends StatelessWidget {
+  const _HomeRecentsSectionShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 16, 12, 4),
+          child: ShimmerBox(
+            height: 22,
+            width: MediaQuery.of(context).size.width * 0.4,
+            borderRadius: 4,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 6,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              mainAxisExtent: 52,
+            ),
+            itemBuilder: (context, index) => const ShimmerBox(
+                height: 52,
+                width: double.infinity,
+                borderRadius: 4,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+Widget _buildImageWidget(String imageUrl) {
+  return imageUrl.startsWith('http')
+      ? Image.network(imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) =>
+              const Icon(Icons.music_note))
+      : Image.asset(imageUrl, fit: BoxFit.cover);
+}
+
+Widget _buildTitleWidget(String title) {
+  return Expanded(
+    child: Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: Text(title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+    ),
+  );
 }

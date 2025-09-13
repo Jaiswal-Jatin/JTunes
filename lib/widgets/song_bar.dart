@@ -5,7 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:j3tunes/extensions/l10n.dart';
-import 'package:j3tunes/main.dart' hide logger;
+import 'package:j3tunes/main.dart';
 import 'package:j3tunes/utilities/common_variables.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:j3tunes/utilities/formatter.dart';
@@ -167,8 +167,8 @@ class _SongBarState extends State<SongBar> {
         };
         activeSongId = 0;
       }
-    } catch (e) {
-      logger.log('Error in song tap: $e', null, null);
+    } catch (e, stackTrace) {
+      logger.log('Error in song tap', e, stackTrace);
       if (mounted) {
         showToast(context, 'Error playing song');
       }

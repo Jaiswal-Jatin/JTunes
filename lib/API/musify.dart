@@ -1373,9 +1373,6 @@ bool isSongContent(dynamic video) {
   return true;
 }
 
-
-final logger = Logger();
-
 Future<Map<String, dynamic>?> getPlaylistInfoHead(String playlistId) async {
   // Placeholder for actual implementation.  Replace with your YouTube API call.
   // This is just a stub.

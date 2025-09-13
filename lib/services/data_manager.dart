@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:j3tunes/extensions/l10n.dart';
+import 'package:j3tunes/API/musify.dart';
 import 'package:j3tunes/main.dart';
 
 // --- Local management for likes, recents, downloads, custom playlists ---
@@ -50,6 +51,11 @@ Future<bool> isPlaylistLiked(String playlistId) async {
 Future<List<String>> getLikedPlaylists() async {
   final box = await _openBox(likedPlaylistsBox);
   return box.keys.cast<String>().toList();
+}
+
+Future<List<dynamic>> getRecents() async {
+  // This is already loaded from Hive in musify.dart
+  return userRecentlyPlayed;
 }
 
 Future<void> addRecentSong(String videoId) async {

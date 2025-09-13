@@ -483,3 +483,32 @@ class PlaylistSongListShimmer extends StatelessWidget {
     );
   }
 }
+
+class ShimmerBox extends StatelessWidget {
+  final double height;
+  final double width;
+  final double borderRadius;
+
+  const ShimmerBox({
+    super.key,
+    required this.height,
+    required this.width,
+    this.borderRadius = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[900]!,
+      highlightColor: Colors.grey[700]!,
+      child: Container(
+        height: height,
+        width: width,
+        decoration: BoxDecoration(
+          color: Colors.grey[850],
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+      ),
+    );
+  }
+}

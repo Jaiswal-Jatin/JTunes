@@ -147,7 +147,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
                 _playlist['list'] = playlistInfo['list'];
               }
             } catch (e) {
-              musify.logger.log('Error loading playlist songs: $e', null, null);
+              logger.log('Error loading playlist songs: $e', null, null);
               _playlist['list'] = [];
             }
           } else {
@@ -170,7 +170,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
             };
           }
         } catch (e) {
-          musify.logger.log('Error fetching playlist: $e', null, null);
+          logger.log('Error fetching playlist: $e', null, null);
           _playlist = {
             'list': [],
             'title': 'Error Loading Playlist',
@@ -202,7 +202,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
         _loadMore();
       }
     } catch (e) {
-      musify.logger.log('Error initializing playlist: $e', null, null);
+      logger.log('Error initializing playlist: $e', null, null);
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -257,7 +257,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
       _currentPage++;
       return list;
     } catch (e, stackTrace) {
-      musify.logger.log('Error fetching playlist songs:', e, stackTrace);
+      logger.log('Error fetching playlist songs:', e, stackTrace);
       return [];
     }
   }

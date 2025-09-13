@@ -37,7 +37,7 @@ class _ArtistPageState extends State<ArtistPage> {
         'playlists': results[1],
       };
     } catch (e) {
-      musify.logger.log('Error fetching artist data', e, null);
+      logger.log('Error fetching artist data', e, null);
       return {'songs': [], 'playlists': []};
     }
   }
