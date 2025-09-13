@@ -173,10 +173,10 @@ class _MiniPlayerState extends State<MiniPlayer> {
                 }
               },
               child: Container(
-              height: _height,
-              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), // Reduced horizontal margin
-              width: double.infinity, // Full width
-              decoration: BoxDecoration(
+                height: _height,
+                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                width: double.infinity,
+                decoration: BoxDecoration(
                 gradient: LinearGradient(
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,

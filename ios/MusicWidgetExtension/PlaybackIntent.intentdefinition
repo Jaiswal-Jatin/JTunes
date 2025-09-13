@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<intentDefinition localizationTable="IntentDefinition">
+    <intent identifier="PlaybackIntent" displayName="Playback Action" category="media" description="Triggers music playback actions." parametersOrder="action">
+        <parameter identifier="action" title="Action" type="enum" required="YES" localizedTitle="Action" enumType="MusicWidgetAction">
+            <enum value="playPause" displayName="Play/Pause" />
+            <enum value="previous" displayName="Previous" />
+            <enum value="next" displayName="Next" />
+        </parameter>
+    </intent>
+    <enumDefinition identifier="MusicWidgetAction" type="String" valuesOrder="playPause,previous,next">
+        <enum value="playPause" displayName="Play/Pause" />
+        <enum value="previous" displayName="Previous" />
+        <enum value="next" displayName="Next" />
+    </enumDefinition>
+</intentDefinition>
