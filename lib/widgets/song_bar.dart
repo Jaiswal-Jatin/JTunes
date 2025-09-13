@@ -1,12 +1,14 @@
 import 'dart:io';
 
 import 'package:j3tunes/API/musify.dart';
+import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:j3tunes/extensions/l10n.dart';
 import 'package:j3tunes/main.dart';
 import 'package:j3tunes/utilities/common_variables.dart';
+import 'package:j3tunes/models/position_data.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:j3tunes/utilities/formatter.dart';
 import 'package:j3tunes/widgets/no_artwork_cube.dart';
@@ -113,26 +115,32 @@ class _SongBarState extends State<SongBar> {
       child: GestureDetector(
         onTap: _handleSongTap,
         child: Card(
+          clipBehavior: Clip.hardEdge,
           color: widget.backgroundColor,
           shape: RoundedRectangleBorder(borderRadius: widget.borderRadius),
           margin: const EdgeInsets.only(bottom: 3),
-          child: Padding(
-            padding: commonBarContentPadding,
-            child: Row(
-              children: [
-                _buildAlbumArtWithSafeSong(primaryColor, safeSong),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _SongInfo(
-                    title: _songTitle ?? '',
-                    artist: _songArtist ?? '',
-                    primaryColor: primaryColor,
-                    secondaryColor: theme.colorScheme.secondary,
-                  ),
+          child: Stack(
+            children: [
+              Padding(
+                padding: commonBarContentPadding,
+                child: Row(
+                  children: [
+                    _buildAlbumArtWithSafeSong(primaryColor, safeSong),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _SongInfo(
+                        title: _songTitle ?? '',
+                        artist: _songArtist ?? '',
+                        primaryColor: primaryColor,
+                        secondaryColor: theme.colorScheme.secondary,
+                      ),
+                    ),
+                    _buildActionButtons(context, primaryColor),
+                  ]
                 ),
-                _buildActionButtons(context, primaryColor),
-              ],
-            ),
+              ),
+              _buildProgressIndicator(context),
+            ],
           ),
         ),
       ),
@@ -173,6 +181,47 @@ class _SongBarState extends State<SongBar> {
         showToast(context, 'Error playing song');
       }
     }
+  }
+
+  Widget _buildProgressIndicator(BuildContext context) {
+    return StreamBuilder<MediaItem?>(
+      stream: audioHandler.mediaItem,
+      builder: (context, snapshot) {
+        if (snapshot.data?.extras?['ytid'] != _ytid) {
+          return const SizedBox.shrink();
+        }
+
+        return StreamBuilder<PositionData>(
+          stream: audioHandler.positionDataStream,
+          builder: (context, snapshot) {
+            final positionData = snapshot.data;
+            final duration = positionData?.duration ?? Duration.zero;
+            final position = positionData?.position ?? Duration.zero;
+
+            if (duration.inSeconds <= 0) {
+              return const SizedBox.shrink();
+            }
+
+            final progress =
+                (position.inSeconds / duration.inSeconds).clamp(0.0, 1.0);
+
+            return Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: Colors.transparent,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  Theme.of(context).colorScheme.primary.withOpacity(0.6),
+                ),
+                minHeight: 3.0,
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   // New: album art builder that uses safeSong for duration

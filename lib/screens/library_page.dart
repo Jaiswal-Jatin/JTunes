@@ -21,6 +21,7 @@
  *     please visit: https://github.com/gokadzev/J3Tunes
  */
 
+import 'dart:math';
 import 'package:j3tunes/API/musify.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
@@ -246,7 +247,13 @@ Future<List<Map<String, dynamic>>> _loadLikedPlaylistsWithSongs() async {
             playlist['list'] = safeSongMaps;
             // Update image if not present
             if (playlist['image'] == null || playlist['image'].toString().isEmpty) {
-              playlist['image'] = safeSongMaps.first['image'] ?? 'assets/images/JTunes.png';
+              final randomSong =
+                  safeSongMaps[Random().nextInt(safeSongMaps.length)];
+              playlist['image'] = randomSong['artUri'] ??
+                  randomSong['image'] ??
+                  randomSong['highResImage'] ??
+                  randomSong['lowResImage'] ??
+                  'assets/images/JTunes.png';
             }
             // Update title if not present
             if (playlist['title'] == null || playlist['title'].toString().isEmpty) {
@@ -352,10 +359,10 @@ Widget _buildPlaylistListView(
       // Check if playlist has songs and get first song's image
       final playlistSongs = safeListConvert(playlist['list']);
       if (playlistSongs.isNotEmpty) {
-        final firstSong = playlistSongs.first;
-        dynamicPlaylistImage = firstSong['artUri'] ??
-            firstSong['image'] ??
-            firstSong['highResImage'] ??
+        final randomSong = playlistSongs[Random().nextInt(playlistSongs.length)];
+        dynamicPlaylistImage = randomSong['artUri'] ??
+            randomSong['image'] ??
+            randomSong['highResImage'] ??
             playlist['image'];
       }
 

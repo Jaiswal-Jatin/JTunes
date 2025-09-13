@@ -356,12 +356,13 @@ class _PlaylistPageState extends State<PlaylistPage> {
     String? playlistImage = _playlist['image'];
     if (_playlist['list'] != null &&
         _playlist['list'] is List &&
-        _playlist['list'].isNotEmpty) {
-      final firstSong = _playlist['list'][0];
-      playlistImage = firstSong['artUri'] ??
-          firstSong['image'] ??
-          firstSong['highResImage'] ??
-          firstSong['lowResImage'] ??
+        (_playlist['list'] as List).isNotEmpty) {
+      final songs = _playlist['list'] as List;
+      final randomSong = songs[Random().nextInt(songs.length)];
+      playlistImage = randomSong['artUri'] ??
+          randomSong['image'] ??
+          randomSong['highResImage'] ??
+          randomSong['lowResImage'] ??
           playlistImage;
     }
     final playlistForCube = Map<String, dynamic>.from(_playlist);

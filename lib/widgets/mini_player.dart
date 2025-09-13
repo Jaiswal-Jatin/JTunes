@@ -164,9 +164,12 @@ class _MiniPlayerState extends State<MiniPlayer> {
             return GestureDetector(
               onTap: () => showNowPlayingPage(context),
               onVerticalDragEnd: (details) {
-              if (details.primaryVelocity! < -300) {
-                showNowPlayingPage(context);
-              }
+                if (details.primaryVelocity! < -300) { // Swipe up
+                  showNowPlayingPage(context);
+                } else if (details.primaryVelocity! > 300) { // Swipe down
+                  audioHandler.stop();
+                  audioHandler.updateQueue([]);
+                }
               },
               child: Container(
               height: _height,
@@ -194,139 +197,168 @@ class _MiniPlayerState extends State<MiniPlayer> {
                   offset: const Offset(0, 4),
                 ),
                 ],
-              ),
-              child: Row(
+              ), // decoration
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                alignment: Alignment.bottomCenter,
                 children: [
-                // Song Artwork
-                Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: SongArtworkWidget(
-                    metadata: metadata,
-                    size: _imageSize,
-                    errorWidgetIconSize: 25,
-                  ),
-                  ),
-                ),
-
-                // Song Info
-                Expanded(
-                  child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
                     children: [
-                    MarqueeWidget(
-                      child: Text(
-                      metadata.title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        shadows: [
-                        Shadow(
-                          color: Colors.black.withOpacity(0.7),
-                          offset: const Offset(0, 1),
-                          blurRadius: 2,
-                        ),
-                        ],
+                    // Song Artwork
+                    Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: SongArtworkWidget(
+                        metadata: metadata,
+                        size: _imageSize,
+                        errorWidgetIconSize: 25,
                       ),
-                      overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (metadata.artist != null) ...[
-                      const SizedBox(height: 2),
-                      MarqueeWidget(
-                      child: Text(
-                        metadata.artist!,
-                        style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                        color: Colors.white.withOpacity(0.9),
-                        shadows: [
-                          Shadow(
-                          color: Colors.black.withOpacity(0.7),
-                          offset: const Offset(0, 1),
-                          blurRadius: 2,
+
+                    // Song Info
+                    Expanded(
+                      child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                        MarqueeWidget(
+                          child: Text(
+                          metadata.title,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            shadows: [
+                            Shadow(
+                              color: Colors.black.withOpacity(0.7),
+                              offset: const Offset(0, 1),
+                              blurRadius: 2,
+                            ),
+                            ],
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (metadata.artist != null) ...[
+                          const SizedBox(height: 2),
+                          MarqueeWidget(
+                          child: Text(
+                            metadata.artist!,
+                            style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.white.withOpacity(0.9),
+                            shadows: [
+                              Shadow(
+                              color: Colors.black.withOpacity(0.7),
+                              offset: const Offset(0, 1),
+                              blurRadius: 2,
+                              ),
+                            ],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          ),
+                        ],
+                        ],
+                      ),
+                      ),
+                    ),
+
+                    // Control Buttons
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                      // Previous Button
+                      Container(
+                        decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                        icon: const Icon(FluentIcons.previous_24_filled),
+                        color: Colors.white,
+                        iconSize: 20,
+                        onPressed: audioHandler.hasPrevious
+                          ? audioHandler.skipToPrevious
+                          : null,
+                        splashColor: Colors.transparent,
+                        ),
+                      ),
+
+                      const SizedBox(width: 8),
+
+                      // Play/Pause Button
+                      Container(
+                        decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
                           ),
                         ],
                         ),
-                        overflow: TextOverflow.ellipsis,
+                        child: PlaybackIconButton(
+                        iconColor: Colors.black,
+                        backgroundColor: Colors.white,
+                        iconSize: 28,
+                        ),
                       ),
+
+                      const SizedBox(width: 8),
+
+                      // Next Button
+                      Container(
+                        decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                        icon: const Icon(FluentIcons.next_24_filled),
+                        color: Colors.white,
+                        iconSize: 20,
+                        onPressed: audioHandler.hasNext
+                          ? audioHandler.skipToNext
+                          : null,
+                        splashColor: Colors.transparent,
+                        ),
                       ),
+
+                      const SizedBox(width: 12),
+                      ],
+                    ),
                     ],
-                    ],
                   ),
+                  StreamBuilder<PlaybackState>(
+                    stream: audioHandler.playbackState,
+                    builder: (context, snapshot) {
+                      final playbackState = snapshot.data;
+                      final position = playbackState?.position ?? Duration.zero;
+                      final duration = metadata.duration ?? Duration.zero;
+
+                      double progress = 0.0;
+                      if (duration.inMilliseconds > 0) {
+                        progress = (position.inMilliseconds /
+                                duration.inMilliseconds)
+                            .clamp(0.0, 1.0);
+                      }
+
+                      return LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 3,
+                        backgroundColor: Colors.white.withOpacity(0.2),
+                        valueColor:
+                            const AlwaysStoppedAnimation<Color>(Colors.white),
+                      );
+                    },
                   ),
-                ),
-
-                // Control Buttons
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                  // Previous Button
-                  Container(
-                    decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                    icon: const Icon(FluentIcons.previous_24_filled),
-                    color: Colors.white,
-                    iconSize: 20,
-                    onPressed: audioHandler.hasPrevious
-                      ? audioHandler.skipToPrevious
-                      : null,
-                    splashColor: Colors.transparent,
-                    ),
-                  ),
-
-                  const SizedBox(width: 8),
-
-                  // Play/Pause Button
-                  Container(
-                    decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                      ),
-                    ],
-                    ),
-                    child: PlaybackIconButton(
-                    iconColor: Colors.black,
-                    backgroundColor: Colors.white,
-                    iconSize: 28,
-                    ),
-                  ),
-
-                  const SizedBox(width: 8),
-
-                  // Next Button
-                  Container(
-                    decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                    icon: const Icon(FluentIcons.next_24_filled),
-                    color: Colors.white,
-                    iconSize: 20,
-                    onPressed: audioHandler.hasNext
-                      ? audioHandler.skipToNext
-                      : null,
-                    splashColor: Colors.transparent,
-                    ),
-                  ),
-
-                  const SizedBox(width: 12),
-                  ],
-                ),
                 ],
               ),
               ),

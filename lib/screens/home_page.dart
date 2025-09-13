@@ -19,6 +19,7 @@ import 'package:j3tunes/widgets/section_header.dart';
 import 'package:j3tunes/widgets/song_bar.dart';
 import 'package:j3tunes/widgets/spinner.dart';
 import 'package:j3tunes/widgets/user_profile_card.dart';
+import 'dart:math';
 import 'package:j3tunes/widgets/shimmer_widgets.dart';
 import 'dart:ui';
 
@@ -126,6 +127,16 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage>
     with AutomaticKeepAliveClientMixin {
   // Keep the page alive to avoid rebuilding
+  String? _getRandomPlaylistImage(List<dynamic> songs) {
+    if (songs.isEmpty) return null;
+    final randomSong = songs[Random().nextInt(songs.length)];
+    final songMap = safeMapConvert(randomSong);
+    return songMap['artUri'] as String? ??
+        songMap['image'] as String? ??
+        songMap['highResImage'] as String? ??
+        songMap['lowResImage'] as String?;
+  }
+
   @override
   bool get wantKeepAlive => true;
 
@@ -237,7 +248,7 @@ class _HomePageState extends State<HomePage>
 
   void _initializeOtherFutures() {
     // Liked playlists from local
-    Future.delayed(const Duration(milliseconds: 200), () async {
+    Future.delayed(Duration.zero, () async {
       if (mounted) {
         try {
           final likedIds = await getLikedPlaylists();
@@ -249,8 +260,9 @@ class _HomePageState extends State<HomePage>
               final songMaps = await yt.fetchPlaylistWithFallback(id);
               final safeSongMaps = safeListConvert(songMaps);
               if (safeSongMaps.isNotEmpty) {
-                String image =
-                    safeSongMaps.first['image'] ?? 'assets/images/JTunes.png';
+                String image = _getRandomPlaylistImage(safeSongMaps) ??
+                    safeSongMaps.first['image'] ??
+                    'assets/images/JTunes.png';
                 likedPlaylists.add({
                   'ytid': id,
                   'title': safeSongMaps.first['title'] ?? 'Liked Playlist',
@@ -281,24 +293,24 @@ class _HomePageState extends State<HomePage>
 
   void _initializeSongFutures() {
     final songCategories = [
-      {'name': 'trending songs 2025', 'delay': 400, 'future': 'trending'},
+      {'name': 'trending songs 2025', 'delay': 10, 'future': 'trending'},
       {
         'name': 'kpop songs 2025 BTS Blackpink NewJeans',
-        'delay': 600,
+        'delay': 15,
         'future': 'kpop'
       },
       {
         'name': 'international top songs 2025 english hits',
-        'delay': 800,
+        'delay': 20,
         'future': 'international'
       },
-      {'name': 'pop songs 2025', 'delay': 1000, 'future': 'pop'},
-      {'name': 'rock songs 2025', 'delay': 1200, 'future': 'rock'},
-      {'name': 'bollywood songs 2025', 'delay': 1400, 'future': 'bollywood'},
-      {'name': 'punjabi songs 2025', 'delay': 1600, 'future': 'punjab'},
-      {'name': 'marathi songs 2025', 'delay': 1800, 'future': 'marathi'},
-      {'name': 'telugu songs 2025', 'delay': 2000, 'future': 'telugu'},
-      {'name': 'tamil songs 2025', 'delay': 2200, 'future': 'tamil'},
+      {'name': 'pop songs 2025', 'delay': 25, 'future': 'pop'},
+      {'name': 'rock songs 2025', 'delay': 30, 'future': 'rock'},
+      {'name': 'bollywood songs 2025', 'delay': 35, 'future': 'bollywood'},
+      {'name': 'punjabi songs 2025', 'delay': 40, 'future': 'punjab'},
+      {'name': 'marathi songs 2025', 'delay': 45, 'future': 'marathi'},
+      {'name': 'telugu songs 2025', 'delay': 50, 'future': 'telugu'},
+      {'name': 'tamil songs 2025', 'delay': 55, 'future': 'tamil'},
     ];
 
     for (final category in songCategories) {
@@ -730,14 +742,10 @@ class _HomePageState extends State<HomePage>
       itemBuilder: (context, index) {
         final playlist = playlists[index];
 
-        // Get first song's image from playlist for favorites
         String? dynamicPlaylistImage = playlist['image'];
         if (playlist['list'] != null && playlist['list'].isNotEmpty) {
-          final firstSong = playlist['list'][0];
-          dynamicPlaylistImage = firstSong['artUri'] ??
-              firstSong['image'] ??
-              firstSong['highResImage'] ??
-              playlist['image'];
+          dynamicPlaylistImage =
+              _getRandomPlaylistImage(playlist['list']) ?? playlist['image'];
         }
 
         // Create modified playlist with dynamic image
@@ -782,11 +790,9 @@ class _HomePageState extends State<HomePage>
 
         if (modifiedPlaylist['list'] != null &&
             (modifiedPlaylist['list'] as List).isNotEmpty) {
-          final firstSong = (modifiedPlaylist['list'] as List).first;
-          modifiedPlaylist['image'] = firstSong['artUri'] ??
-              firstSong['image'] ??
-              firstSong['highResImage'] ??
-              modifiedPlaylist['image'];
+          modifiedPlaylist['image'] =
+              _getRandomPlaylistImage(modifiedPlaylist['list']) ??
+                  modifiedPlaylist['image'];
         }
 
         return GestureDetector(
@@ -1163,20 +1169,21 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  // UPDATED PLAYLIST CARD METHOD - Ab first 4 songs ka combined image dikhega
+  // UPDATED PLAYLIST CARD METHOD - Now uses a random image from the playlist
   Widget _buildPlaylistCardWithOverlay(
       Map<String, dynamic> playlist, double size) {
-    // Show first song's image as playlist image, overlay playlist name at bottom
-    String? imageUrl;
-    if (playlist['list'] != null && playlist['list'].isNotEmpty) {
-      final firstSong = playlist['list'][0];
-      imageUrl = firstSong['artUri'] ??
-          firstSong['image'] ??
-          firstSong['highResImage'] ??
-          firstSong['lowResImage'];
-    }
-    imageUrl ??= 'assets/images/JTunes.png';
+    // Use the image provided in the playlist map, which should be randomized by the caller.
+    String? imageUrl = playlist['image'] as String?;
 
+    // Fallback to a random image if the caller didn't provide one.
+    if ((imageUrl == null || imageUrl.isEmpty) &&
+        playlist['list'] != null &&
+        (playlist['list'] as List).isNotEmpty) {
+      imageUrl = _getRandomPlaylistImage(playlist['list']);
+    }
+
+    // Final fallback to a default asset.
+    imageUrl ??= 'assets/images/JTunes.png';
     // Remove playlist title overlay from the card image
     return Container(
       height: size * 0.75,

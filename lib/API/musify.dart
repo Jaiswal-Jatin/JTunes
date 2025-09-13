@@ -1178,10 +1178,11 @@ Future<List<dynamic>> getAlbumsFromDatabase() async {
 
       // Update album image with first song's image if available
       if (album['list'] != null && album['list'].isNotEmpty) {
-        final firstSong = album['list'][0];
-        final dynamicImage = firstSong['artUri'] ??
-            firstSong['image'] ??
-            firstSong['highResImage'] ??
+        final songs = album['list'] as List;
+        final randomSong = songs[Random().nextInt(songs.length)];
+        final dynamicImage = randomSong['artUri'] ??
+            randomSong['image'] ??
+            randomSong['highResImage'] ??
             album['image'];
         if (dynamicImage != null) {
           album['image'] = dynamicImage;
