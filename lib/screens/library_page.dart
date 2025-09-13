@@ -27,6 +27,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:j3tunes/main.dart';
 import 'package:j3tunes/extensions/l10n.dart';
+import 'package:j3tunes/services/data_manager.dart' show getLikedPlaylists;
 import 'package:j3tunes/services/playlist_download_service.dart';
 import 'package:j3tunes/services/router_service.dart';
 import 'package:j3tunes/services/settings_manager.dart';
@@ -189,8 +190,8 @@ class _LibraryPageState extends State<LibraryPage> {
   return ValueListenableBuilder(
     valueListenable: currentLikedPlaylistsLength,
     builder: (_, value, __) {
-      // Always show the section if there are any liked playlists
-      if (userLikedPlaylists.isEmpty) {
+      // Use the value from the notifier to decide whether to show the section
+      if (value == 0) {
         return const SizedBox();
       }
       
@@ -225,64 +226,20 @@ class _LibraryPageState extends State<LibraryPage> {
 
 Future<List<Map<String, dynamic>>> _loadLikedPlaylistsWithSongs() async {
   final playlistsWithSongs = <Map<String, dynamic>>[];
-  final yt = YoutubeService();
-  
-  // Process all liked playlists, not just a subset
-  for (final rawPlaylist in userLikedPlaylists) {
+  final likedIds = await getLikedPlaylists();
+
+  for (final id in likedIds) {
     try {
-      final playlist = safeMapConvert(rawPlaylist);
-      
-      // Ensure we have a valid ytid
-      if (playlist['ytid'] == null || playlist['ytid'].toString().isEmpty) {
-        logger.log('Skipping playlist with no ytid: ${playlist['title']}', null, null);
-        continue;
+      final playlistData = await getPlaylistInfoForWidget(id);
+      if (playlistData != null) {
+        playlistsWithSongs.add(Map<String, dynamic>.from(playlistData));
       }
-      
-      // If playlist doesn't have songs, try to load them
-      if (playlist['list'] == null || (playlist['list'] as List).isEmpty) {
-        try {
-          final songMaps = await yt.fetchPlaylistWithFallback(playlist['ytid']);
-          final safeSongMaps = safeListConvert(songMaps);
-          if (safeSongMaps.isNotEmpty) {
-            playlist['list'] = safeSongMaps;
-            // Update image if not present
-            if (playlist['image'] == null || playlist['image'].toString().isEmpty) {
-              final randomSong =
-                  safeSongMaps[Random().nextInt(safeSongMaps.length)];
-              playlist['image'] = randomSong['artUri'] ??
-                  randomSong['image'] ??
-                  randomSong['highResImage'] ??
-                  randomSong['lowResImage'] ??
-                  'assets/images/JTunes.png';
-            }
-            // Update title if not present
-            if (playlist['title'] == null || playlist['title'].toString().isEmpty) {
-              playlist['title'] = safeSongMaps.first['title'] ?? 'Liked Playlist';
-            }
-          } else {
-            // Even if no songs, add the playlist with empty list
-            playlist['list'] = <Map<String, dynamic>>[];
-          }
-        } catch (e) {
-          logger.log('Error loading songs for playlist ${playlist['ytid']}: $e', null, null);
-          playlist['list'] = <Map<String, dynamic>>[];
-        }
-      } else {
-        // Ensure existing list is properly converted
-        playlist['list'] = safeListConvert(playlist['list']);
-      }
-      
-      // Always add the playlist, even if it has no songs
-      playlistsWithSongs.add(playlist);
-      
     } catch (e) {
-      logger.log('Error processing liked playlist: $e', null, null);
-      // Add playlist even if there's an error, but with empty list
-      final playlist = safeMapConvert(rawPlaylist);
-      playlist['list'] = <Map<String, dynamic>>[];
-      if (playlist['ytid'] != null) {
-        playlistsWithSongs.add(playlist);
-      }
+      logger.log(
+        'Error loading liked playlist $id for library: $e',
+        null,
+        null,
+      );
     }
   }
   

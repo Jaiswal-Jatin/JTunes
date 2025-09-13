@@ -161,7 +161,21 @@ class _HomePageState extends State<HomePage>
     super.initState();
     _initializeFutures();
     audioHandler.mediaItem.listen(_onMediaItemChanged);
+    currentLikedPlaylistsLength.addListener(_refreshLikedPlaylists);
     _onMediaItemChanged(audioHandler.mediaItem.value);
+  }
+
+  @override
+  void dispose() {
+    currentLikedPlaylistsLength.removeListener(_refreshLikedPlaylists);
+    super.dispose();
+  }
+
+  void _refreshLikedPlaylists() {
+    if (mounted) {
+      // Re-initialize liked playlists to reflect changes
+      _initializeLikedPlaylists();
+    }
   }
 
   void _onMediaItemChanged(MediaItem? mediaItem) {
@@ -248,33 +262,42 @@ class _HomePageState extends State<HomePage>
 
   void _initializeOtherFutures() {
     // Liked playlists from local
+    _initializeLikedPlaylists();
+
+    // Initialize song futures with staggered delays
+    _recentlyPlayedFuture = getRecents();
+    _initializeSongFutures();
+  }
+
+  void _initializeLikedPlaylists() {
     Future.delayed(Duration.zero, () async {
       if (mounted) {
         try {
           final likedIds = await getLikedPlaylists();
-          final yt = YoutubeService();
           final likedPlaylists = <Map<String, dynamic>>[];
 
           for (final id in likedIds) {
             try {
-              final songMaps = await yt.fetchPlaylistWithFallback(id);
-              final safeSongMaps = safeListConvert(songMaps);
-              if (safeSongMaps.isNotEmpty) {
-                String image = _getRandomPlaylistImage(safeSongMaps) ??
-                    safeSongMaps.first['image'] ??
-                    'assets/images/JTunes.png';
-                likedPlaylists.add({
-                  'ytid': id,
-                  'title': safeSongMaps.first['title'] ?? 'Liked Playlist',
-                  'image': image,
-                  'list': safeSongMaps,
-                });
+              final playlistData = await getPlaylistInfoForWidget(id);
+              if (playlistData != null) {
+                final safeSongMaps = safeListConvert(playlistData['list']);
+                if (safeSongMaps.isNotEmpty) {
+                  String image = _getRandomPlaylistImage(safeSongMaps) ??
+                      playlistData['image'] ??
+                      safeSongMaps.first['image'] ??
+                      'assets/images/JTunes.png';
+                  likedPlaylists.add({
+                    'ytid': id,
+                    'title': playlistData['title'] ?? 'Liked Playlist',
+                    'image': image,
+                    'list': safeSongMaps,
+                  });
+                }
               }
             } catch (e) {
               print('Error fetching liked playlist $id: $e');
             }
           }
-
           if (mounted) {
             setState(() {
               _likedPlaylistsFuture = Future.value(likedPlaylists);
@@ -285,10 +308,6 @@ class _HomePageState extends State<HomePage>
         }
       }
     });
-
-    // Initialize song futures with staggered delays
-    _recentlyPlayedFuture = getRecents();
-    _initializeSongFutures();
   }
 
   void _initializeSongFutures() {

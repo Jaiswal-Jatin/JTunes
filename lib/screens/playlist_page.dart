@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_const_constructors
+
 import 'package:j3tunes/widgets/shimmer_widgets.dart';
 // ignore_for_file: directives_ordering, unused_field, prefer_final_fields
 
@@ -272,7 +274,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
               Navigator.pop(context, widget.playlistData == _playlist),
         ),
         actions: [
-          if (widget.playlistId != null) ...[_buildLikeButton()],
+          if (_playlist != null &&
+              _playlist['ytid'] != null &&
+              _playlist['source'] != 'user-created') ...[_buildLikeButton()],
           const SizedBox(width: 10),
           if (_playlist != null) ...[
             _buildSyncButton(),
@@ -402,20 +406,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
               playlistLikeStatus.value,
             );
 
-            // Update the global liked playlists list to refresh library
-            if (playlistLikeStatus.value) {
-              if (!userLikedPlaylists.contains(_playlist)) {
-                userLikedPlaylists.add(_playlist);
-              }
-            } else {
-              userLikedPlaylists.removeWhere(
-                  (p) => p['ytid'] == (_playlist['ytid'] ?? widget.playlistId));
-            }
-
-            // Update the length notifier to trigger library refresh
-            currentLikedPlaylistsLength.value = userLikedPlaylists.length;
-
-            setState(() {});
+            // Update the length notifier to trigger library and home refresh
+            final likedIds = await getLikedPlaylists();
+            currentLikedPlaylistsLength.value = likedIds.length;
           },
         );
       },
@@ -684,22 +677,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
     });
   }
 
-  Widget _buildShuffleSongActionButton() {
-    return IconButton(
-      color: Theme.of(context).colorScheme.primary,
-      splashColor: Colors.transparent,
-      highlightColor: Colors.transparent,
-      icon: const Icon(FluentIcons.arrow_shuffle_16_filled),
-      iconSize: 25,
-      onPressed: () {
-        final _newList = List.of(_playlist['list'])..shuffle();
-        setState(() {
-          _playlist['list'] = _newList;
-        });
-      },
-    );
-  }
-
   Widget _buildSortSongActionButton() {
     return DropdownButton<String>(
       borderRadius: BorderRadius.circular(5),
@@ -750,8 +727,26 @@ class _PlaylistPageState extends State<PlaylistPage> {
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         _buildSortSongActionButton(),
-        const SizedBox(width: 5),
-        _buildShuffleSongActionButton(),
+        const SizedBox(width: 10),
+        ElevatedButton(
+          onPressed: () {
+            if (_playlist != null &&
+                _playlist['list'] != null &&
+                (_playlist['list'] as List).isNotEmpty) {
+              audioHandler.playPlaylistSong(playlist: _playlist, songIndex: 0);
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            shape: const CircleBorder(),
+            padding: const EdgeInsets.all(16),
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+          ),
+          child: const Icon(
+            Icons.play_arrow,
+            size: 30,
+          ),
+        ),
       ],
     );
   }

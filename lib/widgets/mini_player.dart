@@ -30,6 +30,7 @@ import 'package:j3tunes/widgets/marque.dart';
 import 'package:j3tunes/widgets/playback_icon_button.dart';
 import 'package:j3tunes/widgets/song_artwork.dart';
 import 'package:palette_generator/palette_generator.dart';
+import 'package:j3tunes/models/position_data.dart';
 
 // Global cache for mini player colors
 final Map<String, Color> _miniPlayerColorCache = {};
@@ -336,17 +337,16 @@ class _MiniPlayerState extends State<MiniPlayer> {
                     ),
                     ],
                   ),
-                  StreamBuilder<PlaybackState>(
-                    stream: audioHandler.playbackState,
+                  StreamBuilder<PositionData>(
+                    stream: audioHandler.positionDataStream,
                     builder: (context, snapshot) {
-                      final playbackState = snapshot.data;
-                      final position = playbackState?.position ?? Duration.zero;
-                      final duration = metadata.duration ?? Duration.zero;
+                      final positionData = snapshot.data;
+                      final position = positionData?.position ?? Duration.zero;
+                      final duration = positionData?.duration ?? Duration.zero;
 
                       double progress = 0.0;
                       if (duration.inMilliseconds > 0) {
-                        progress = (position.inMilliseconds /
-                                duration.inMilliseconds)
+                        progress = (position.inMilliseconds / duration.inMilliseconds)
                             .clamp(0.0, 1.0);
                       }
 
