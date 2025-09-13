@@ -565,12 +565,11 @@ class _SettingsPageState extends State<SettingsPage> {
         return ConfirmationDialog(
           submitMessage: context.l10n!.clear,
           confirmationMessage: context.l10n!.clearSearchHistoryQuestion,
-          onCancel: () => {Navigator.of(context).pop()},
-          onSubmit: () => {
-            Navigator.of(context).pop(),
-            searchHistory = [],
-            deleteData('user', 'searchHistory'),
-            showToast(context, '${context.l10n!.searchHistoryMsg}!'),
+          onCancel: () => Navigator.of(context).pop(),
+          onSubmit: () {
+            Navigator.of(context).pop();
+            addOrUpdateData('user', 'searchHistory', []);
+            showToast(context, '${context.l10n!.searchHistoryMsg}!');
           },
         );
       },
@@ -584,12 +583,11 @@ class _SettingsPageState extends State<SettingsPage> {
         return ConfirmationDialog(
           submitMessage: context.l10n!.clear,
           confirmationMessage: context.l10n!.clearRecentlyPlayedQuestion,
-          onCancel: () => {Navigator.of(context).pop()},
-          onSubmit: () => {
-            Navigator.of(context).pop(),
-            musify.userRecentlyPlayed = [],
-            deleteData('user', 'recentlyPlayedSongs'),
-            showToast(context, '${context.l10n!.recentlyPlayedMsg}!'),
+          onCancel: () => Navigator.of(context).pop(),
+          onSubmit: () {
+            Navigator.of(context).pop();
+            musify.clearRecentlyPlayed();
+            showToast(context, '${context.l10n!.recentlyPlayedMsg}!');
           },
         );
       },

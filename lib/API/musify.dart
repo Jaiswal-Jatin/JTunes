@@ -350,6 +350,12 @@ void removeUserCustomPlaylist(dynamic playlist) {
   addOrUpdateData('user', 'customPlaylists', userCustomPlaylists.value);
 }
 
+Future<void> clearRecentlyPlayed() async {
+  userRecentlyPlayed.clear();
+  await deleteData('user', 'recentlyPlayedSongs');
+  currentRecentlyPlayedLength.value = 0;
+}
+
 Future<void> updateSongLikeStatus(dynamic songId, bool add) async {
   try {
     if (add) {

@@ -32,11 +32,19 @@ class _ArtistPageState extends State<ArtistPage> {
       final songsFuture = musify.search(widget.artistName, 'song');
       final playlistsFuture = musify.search(widget.artistName, 'playlist');
 
-      final results = await Future.wait([songsFuture, playlistsFuture]);
+      final List<dynamic> results = await Future.wait([songsFuture, playlistsFuture]);
+
+      // Safely cast the results to the expected type.
+      final songs = (results[0] as List?)
+          ?.map((e) => Map<String, dynamic>.from(e))
+          .toList() ?? [];
+      final playlists = (results[1] as List?)
+          ?.map((e) => Map<String, dynamic>.from(e))
+          .toList() ?? [];
 
       return {
-        'songs': results[0],
-        'playlists': results[1],
+        'songs': songs,
+        'playlists': playlists,
       };
     } catch (e) {
       logger.log('Error fetching artist data', e, null);

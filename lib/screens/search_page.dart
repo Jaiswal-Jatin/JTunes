@@ -38,7 +38,9 @@ import 'package:j3tunes/widgets/custom_search_bar.dart';
 import 'package:j3tunes/widgets/playlist_bar.dart';
 import 'package:j3tunes/widgets/section_title.dart';
 import 'package:j3tunes/widgets/song_bar.dart';
-import 'package:j3tunes/API/musify.dart';
+import 'package:j3tunes/API/musify.dart' as musify;
+import 'package:j3tunes/screens/artist_page.dart';
+import 'package:j3tunes/widgets/shimmer_widgets.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -47,40 +49,21 @@ class SearchPage extends StatefulWidget {
   _SearchPageState createState() => _SearchPageState();
 }
 
-List searchHistory = Hive.box('user').get('searchHistory', defaultValue: []);
-
 class _SearchPageState extends State<SearchPage> {
-  // Helper to convert Video object to Map for UI widgets
-  Map<String, dynamic> videoToMap(dynamic video) {
-    // Defensive: support both Video and Map
-    if (video is Map<String, dynamic>) return video;
-    String? imageUrl;
-    try {
-      imageUrl = video.thumbnails?.highResUrl;
-    } catch (_) {
-      imageUrl = null;
-    }
-    return {
-      'title': video.title ?? '',
-      'ytid': video.id?.value ?? '',
-      'image': imageUrl ?? 'assets/images/JTunes.png',
-      'lowResImage': imageUrl ?? 'assets/images/JTunes.png',
-      'artist': video.author ?? '',
-      'duration': video.duration?.inSeconds ?? 0,
-      'description': video.description ?? '',
-    };
-  }
-
   final TextEditingController searchController = TextEditingController();
   List<String> searchHistory = [];
   bool showResults = false;
   final FocusNode _inputNode = FocusNode();
   final ValueNotifier<bool> _fetchingSongs = ValueNotifier(false);
-  int maxSongsInList = 10;
+  int maxResultsToShow = 5;
   Timer? _debounceTimer;
+
+  // Separate lists for each category
   List _songsSearchResult = [];
   List _albumsSearchResult = [];
   List _playlistsSearchResult = [];
+  List _artistsSearchResult = [];
+
   List<String> _suggestionsList = [];
   List<String> _trendingSearches = [
     'Arijit Singh',
@@ -126,12 +109,14 @@ class _SearchPageState extends State<SearchPage> {
     });
   }
 
-  // Search history load karne ka function (ab sahi async/await ke sath)
-  void loadSearchHistory() async {
-    final history = await data_manager.getData('user', 'searchHistory');
-    setState(() {
-      searchHistory = List<String>.from((history as Iterable<dynamic>));
-    });
+  // Load search history from Hive
+  Future<void> loadSearchHistory() async {
+    final dynamic history = await data_manager.getData('user', 'searchHistory');
+    if (mounted) {
+      setState(() {
+        searchHistory = (history is List) ? List<String>.from(history) : [];
+      });
+    }
   }
 
   void onSearchSubmitted(String query) {
@@ -139,7 +124,7 @@ class _SearchPageState extends State<SearchPage> {
       // Add to history
       if (!searchHistory.contains(query)) {
         searchHistory.insert(0, query);
-        if (searchHistory.length > 10) {
+        if (searchHistory.length > 15) {
           searchHistory.removeLast();
         }
         data_manager.addOrUpdateData('user', 'searchHistory', searchHistory);
@@ -159,6 +144,7 @@ class _SearchPageState extends State<SearchPage> {
       _songsSearchResult.clear();
       _albumsSearchResult.clear();
       _playlistsSearchResult.clear();
+      _artistsSearchResult.clear();
       _suggestionsList.clear();
       showResults = false;
     });
@@ -172,7 +158,6 @@ class _SearchPageState extends State<SearchPage> {
     showToast(context, 'Search history cleared!');
   }
 
-  // Enhanced performSearch function with better playlist handling
   Future<void> performSearch(String query) async {
     _debounceTimer?.cancel();
 
@@ -193,100 +178,46 @@ class _SearchPageState extends State<SearchPage> {
         setState(() {
           _songsSearchResult.clear();
           _albumsSearchResult.clear();
+          _artistsSearchResult.clear();
           _playlistsSearchResult.clear();
         });
 
-        // Search for songs using the enhanced search function
-        final songResults = await search(query, 'song');
-        
+        // Use the reliable search from musify.dart
+        final songs = await musify.search(query, 'song');
+        final playlists = await musify.search(query, 'playlist');
+        // A simple way to get albums is to search for "query album"
+        final albums = await musify.search('$query album', 'playlist');
+
         if (!mounted) return;
         setState(() {
-          _songsSearchResult = songResults.take(20).toList();
+          _songsSearchResult = songs;
+          _playlistsSearchResult = playlists;
+          _albumsSearchResult = albums;
+          _artistsSearchResult = []; // Artist search is not supported by this method
         });
-
-        // Search for playlists with proper song loading
-        await _loadPlaylistsWithSongs(query);
         
       } catch (e) {
         main_app.logger.log('Search error: $e', null, null);
       } finally {
-        if (!mounted) return;
-        _fetchingSongs.value = false;
-      }
-    });
-
-    // Hide suggestions after search
-    if (!mounted) return;
-    setState(() {
-      _suggestionsList.clear();
-    });
-  }
-
-  // Enhanced playlist loading with songs
-  Future<void> _loadPlaylistsWithSongs(String query) async {
-    try {
-      // Search for playlists using the enhanced search function
-      final playlistResults = await search(query, 'playlist');
-      
-      // Load songs for each playlist
-      final playlistsWithSongs = <Map<String, dynamic>>[];
-      
-      for (final playlist in playlistResults.take(5)) {
-        try {
-          // Ensure playlist has proper image
-          String? playlistImage = playlist['image'] ?? 
-                                 playlist['highResImage'] ?? 
-                                 playlist['lowResImage'];
-          
-          // Get playlist info with songs
-          final playlistInfo = await getPlaylistInfoForWidget(playlist['ytid']);
-          if (playlistInfo != null && playlistInfo['list'] != null) {
-            final playlistWithImage = Map<String, dynamic>.from(playlistInfo);
-            // Ensure image is preserved
-            if (playlistImage != null) {
-              playlistWithImage['image'] = playlistImage;
-            }
-            playlistsWithSongs.add(playlistWithImage);
-          } else {
-            // If we can't get songs, still add the playlist but mark it
-            playlist['list'] = [];
-            if (playlistImage != null) {
-              playlist['image'] = playlistImage;
-            }
-            playlistsWithSongs.add(playlist);
-          }
-        } catch (e) {
-          main_app.logger.log('Error loading playlist ${playlist['ytid']}: $e', null, null);
-          // Add playlist without songs as fallback
-          playlist['list'] = [];
-          playlistsWithSongs.add(playlist);
+        if (mounted) {
+          _fetchingSongs.value = false;
         }
       }
-
-      if (!mounted) return;
-      setState(() {
-        _playlistsSearchResult = playlistsWithSongs;
-      });
-      
-    } catch (e) {
-      main_app.logger.log('Error loading playlists: $e', null, null);
-    }
+    });
   }
 
-  // Spotify-style: fetch live suggestions (dummy for now)
+  // Fetch live suggestions from API
   Future<void> fetchSuggestions(String query) async {
-    final lower = query.toLowerCase();
-    final dummySuggestions = [
-      '$query songs',
-      '$query playlist',
-      '$query album',
-      'Best of $query',
-      'Top $query hits',
-      'Remix $query',
-      'Live $query',
-    ].where((s) => s.toLowerCase().contains(lower)).toList();
-    setState(() {
-      _suggestionsList = dummySuggestions;
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 200), () async {
+      if (query.isNotEmpty) {
+        final suggestions = await musify.getSearchSuggestions(query);
+        if (mounted) {
+          setState(() {
+            _suggestionsList = suggestions;
+          });
+        }
+      }
     });
   }
 
@@ -344,18 +275,26 @@ class _SearchPageState extends State<SearchPage> {
                 _buildEnhancedSuggestionsSection(primaryColor),
 
               // Enhanced Search History Section
-              if (!showResults ||
-                  (_songsSearchResult.isEmpty && _albumsSearchResult.isEmpty))
+              if (!showResults && searchController.text.isEmpty)
                 _buildEnhancedHistorySection(primaryColor),
 
               // Enhanced Search Results Section
-              if (showResults)
-                _buildEnhancedResultsSection(primaryColor),
+              if (showResults) _buildSearchResults(primaryColor),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildSearchResults(Color primaryColor) {
+    if (_fetchingSongs.value) {
+      return const SearchShimmer();
+    }
+    if (_songsSearchResult.isEmpty && _albumsSearchResult.isEmpty && _playlistsSearchResult.isEmpty && _artistsSearchResult.isEmpty) {
+      return const NoResults();
+    }
+    return _buildEnhancedResultsSection(primaryColor);
   }
 
   Widget _buildEnhancedTrendingSection(Color primaryColor) {
@@ -655,7 +594,7 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _buildEnhancedResultsSection(Color primaryColor) {
+  Widget _buildEnhancedResultsSection(Color primaryColor) {    
     return Column(
       children: [
         // Enhanced Songs Section
@@ -672,14 +611,14 @@ class _SearchPageState extends State<SearchPage> {
             ),
             child: Column(
               children: List.generate(
-                _songsSearchResult.length > maxSongsInList
-                    ? maxSongsInList
+                _songsSearchResult.length > maxResultsToShow
+                    ? maxResultsToShow
                     : _songsSearchResult.length,
                 (index) {
                   final borderRadius = getItemBorderRadius(
                     index,
-                    _songsSearchResult.length > maxSongsInList
-                        ? maxSongsInList
+                    _songsSearchResult.length > maxResultsToShow
+                        ? maxResultsToShow
                         : _songsSearchResult.length,
                   );
                   final song = _songsSearchResult[index];
@@ -703,6 +642,35 @@ class _SearchPageState extends State<SearchPage> {
           ),
         ],
 
+        // Artists Section
+        if (_artistsSearchResult.isNotEmpty) ...[
+          _buildEnhancedSectionTitle('Artists', FluentIcons.person_24_regular, primaryColor),
+          Container(
+            margin: const EdgeInsets.only(bottom: 24),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+              ),
+            ),
+            child: Column(
+              children: List.generate(
+                _artistsSearchResult.length > maxResultsToShow
+                    ? maxResultsToShow
+                    : _artistsSearchResult.length,
+                (index) {
+                  final artist = _artistsSearchResult[index];
+                  return _buildArtistTile(
+                    artist,
+                    primaryColor,
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+
         // Enhanced Albums Section
         if (_albumsSearchResult.isNotEmpty) ...[
           _buildEnhancedSectionTitle('Albums', FluentIcons.cd_16_filled, primaryColor),
@@ -717,15 +685,15 @@ class _SearchPageState extends State<SearchPage> {
             ),
             child: Column(
               children: List.generate(
-                _albumsSearchResult.length > maxSongsInList
-                    ? maxSongsInList
+                _albumsSearchResult.length > maxResultsToShow
+                    ? maxResultsToShow
                     : _albumsSearchResult.length,
                 (index) {
                   final playlist = _albumsSearchResult[index];
                   final borderRadius = getItemBorderRadius(
                     index,
-                    _albumsSearchResult.length > maxSongsInList
-                        ? maxSongsInList
+                    _albumsSearchResult.length > maxResultsToShow
+                        ? maxResultsToShow
                         : _albumsSearchResult.length,
                   );
                   return PlaylistBar(
@@ -758,22 +726,22 @@ class _SearchPageState extends State<SearchPage> {
             ),
             child: Column(
               children: List.generate(
-                _playlistsSearchResult.length > maxSongsInList
-                    ? maxSongsInList
+                _playlistsSearchResult.length > maxResultsToShow
+                    ? maxResultsToShow
                     : _playlistsSearchResult.length,
                 (index) {
                   final playlist = _playlistsSearchResult[index];
                   return PlaylistBar(
                     key: ValueKey(playlist['ytid']),
-                    playlist['title'],
+                    playlist['title'] ?? 'Unknown Playlist',
                     playlistId: playlist['ytid'],
                     playlistData: playlist,
-                    playlistArtwork: playlist['image'] ?? playlist['highResImage'] ?? playlist['lowResImage'],
+                    playlistArtwork: playlist['thumbnails']?.last?['url'] ?? playlist['image'],
                     cubeIcon: FluentIcons.apps_list_24_filled,
                     borderRadius: getItemBorderRadius(
                       index,
-                      _playlistsSearchResult.length > maxSongsInList
-                          ? maxSongsInList
+                      _playlistsSearchResult.length > maxResultsToShow
+                          ? maxResultsToShow
                           : _playlistsSearchResult.length,
                     ),
                   );
@@ -783,6 +751,37 @@ class _SearchPageState extends State<SearchPage> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildArtistTile(Map artist, Color primaryColor) {
+    final imageUrl = artist['thumbnails']?.last?['url'];
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundImage: (imageUrl != null) ? NetworkImage(imageUrl) : null,
+        backgroundColor: primaryColor.withOpacity(0.1),
+        child: (imageUrl == null)
+            ? Icon(FluentIcons.person_24_filled, color: primaryColor)
+            : null,
+      ),
+      title: Text(
+        artist['artist'] ?? 'Unknown Artist',
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(
+        'Artist',
+        style: TextStyle(
+          color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+        ),
+      ),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ArtistPage(artistName: artist['artist']),
+          ),
+        );
+      },
     );
   }
 
@@ -823,13 +822,71 @@ class _SearchPageState extends State<SearchPage> {
     return showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
-        return ConfirmationDialog(
-          confirmationMessage: 'Remove "$query" from search history?',
-          submitMessage: context.l10n!.confirm,
-          onCancel: () => Navigator.of(context).pop(false),
-          onSubmit: () => Navigator.of(context).pop(true),
+        return AlertDialog(
+          title: Text('Remove from History'),
+          content: Text('Remove "$query" from your search history?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('CANCEL'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text('REMOVE'),
+            ),
+          ],
         );
       },
+    );
+  }
+}
+
+class SearchShimmer extends StatelessWidget {
+  const SearchShimmer({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: const [
+        HomeSongSectionShimmer(title: 'Songs'),
+        HomeSongSectionShimmer(title: 'Artists'),
+        HomePlaylistSectionShimmer(title: 'Playlists'),
+      ],
+    );
+  }
+}
+
+class NoResults extends StatelessWidget {
+  const NoResults({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              FluentIcons.search_info_24_regular,
+              size: 80,
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'No results found',
+              style: Theme.of(context).textTheme.headlineSmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try a different keyword or check your spelling.',
+              style: Theme.of(context).textTheme.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
