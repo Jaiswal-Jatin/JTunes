@@ -998,7 +998,7 @@ Future<String?> getSongLyrics(String? artist, String title) async {
   return lyrics.value;
 }
 
-Future<bool> makeSongOffline(dynamic song, {bool fromPlaylist = false}) async {
+Future<bool> makeSongOffline(dynamic song) async {
   try {
     final String? ytid = song['ytid'];
 
@@ -1006,10 +1006,7 @@ Future<bool> makeSongOffline(dynamic song, {bool fromPlaylist = false}) async {
       logger.log('makeSongOffline: song["ytid"] is null or empty', null, null);
       return false;
     }
-
-    if (!fromPlaylist && isSongAlreadyOffline(ytid)) {
-      return true;
-    }
+    if (isSongAlreadyOffline(ytid)) return true;
 
     final audioPath = FilePaths.getAudioPath(ytid);
     final audioFile = File(audioPath);
@@ -1060,12 +1057,12 @@ Future<bool> makeSongOffline(dynamic song, {bool fromPlaylist = false}) async {
 
     song['audioPath'] = audioFile.path;
     song['isOffline'] = true;
-    if (!fromPlaylist) {
-      userOfflineSongs.add(song);
-      await addOrUpdateData('userNoBackup', 'offlineSongs', userOfflineSongs);
-      currentOfflineSongsLength.value = userOfflineSongs.length;
-    }
 
+    // Add to offline list, replacing if it already exists to update metadata.
+    userOfflineSongs.removeWhere((s) => s['ytid'] == ytid);
+    userOfflineSongs.add(song);
+    await addOrUpdateData('userNoBackup', 'offlineSongs', userOfflineSongs);
+    currentOfflineSongsLength.value = userOfflineSongs.length;
     return true;
   } catch (e, stackTrace) {
     logger.log('Error making song offline', e, stackTrace);
@@ -1073,10 +1070,7 @@ Future<bool> makeSongOffline(dynamic song, {bool fromPlaylist = false}) async {
   }
 }
 
-Future<bool> removeSongFromOffline(
-  dynamic songId, {
-  bool fromPlaylist = false,
-}) async {
+Future<bool> removeSongFromOffline(dynamic songId) async {
   try {
     final audioPath = FilePaths.getAudioPath(songId);
     final audioFile = File(audioPath);
@@ -1095,12 +1089,9 @@ Future<bool> removeSongFromOffline(
       logger.log('Error deleting artwork file', e, stackTrace);
     }
 
-    if (!fromPlaylist) {
-      userOfflineSongs.removeWhere((song) => song['ytid'] == songId);
-      currentOfflineSongsLength.value = userOfflineSongs.length;
-      await addOrUpdateData('userNoBackup', 'offlineSongs', userOfflineSongs);
-    }
-
+    userOfflineSongs.removeWhere((song) => song['ytid'] == songId);
+    currentOfflineSongsLength.value = userOfflineSongs.length;
+    await addOrUpdateData('userNoBackup', 'offlineSongs', userOfflineSongs);
     return true;
   } catch (e, stackTrace) {
     logger.log('Error removing song from offline storage', e, stackTrace);

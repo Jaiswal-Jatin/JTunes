@@ -42,6 +42,7 @@ import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:j3tunes/utilities/playlist_image_picker.dart';
 import 'package:j3tunes/utilities/utils.dart';
 import 'package:j3tunes/widgets/playlist_cube.dart';
+import 'package:j3tunes/API/musify.dart' show userOfflineSongs;
 import 'package:j3tunes/widgets/playlist_header.dart';
 import 'package:j3tunes/widgets/song_bar.dart';
 import 'package:j3tunes/widgets/spinner.dart';
@@ -138,6 +139,25 @@ class _PlaylistPageState extends State<PlaylistPage> {
         // Playlist data passed from library or search
         _playlist = Map<String, dynamic>.from(widget.playlistData);
 
+        // If this is an offline playlist, the 'list' contains only song IDs.
+        // We need to fetch the full song data from the main offline songs list.
+        if (_playlist['downloadedAt'] != null &&
+            _playlist['list'] != null &&
+            _playlist['list'] is List &&
+            (_playlist['list'] as List).isNotEmpty &&
+            (_playlist['list'] as List).first is String) {
+          final songIds = List<String>.from(_playlist['list']);
+          final offlineSongs =
+              List<Map<String, dynamic>>.from(userOfflineSongs);
+          final offlineSongsMap = {
+            for (var song in offlineSongs) song['ytid'] as String: song
+          };
+          final playlistSongs = songIds
+              .map((id) => offlineSongsMap[id])
+              .whereType<Map<String, dynamic>>()
+              .toList();
+          _playlist['list'] = playlistSongs;
+        }
         // Ensure the playlist has a proper list
         if (_playlist['list'] == null || (_playlist['list'] as List).isEmpty) {
           // Try to load songs if playlist doesn't have them

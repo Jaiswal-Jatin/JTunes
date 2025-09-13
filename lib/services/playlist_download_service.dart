@@ -144,7 +144,7 @@ class OfflinePlaylistService {
               progressNotifier.value.completed++;
               progressNotifier.notifyListeners();
             } else {
-              final success = await makeSongOffline(song, fromPlaylist: true);
+              final success = await makeSongOffline(song);
               if (success) {
                 progressNotifier.value.completed++;
               } else {
@@ -236,7 +236,7 @@ class OfflinePlaylistService {
           'title': playlist['title'],
           'image': playlist['image'],
           'source': playlist['source'],
-          'list': songsList,
+          'list': songsList.map((s) => s['ytid']).whereType<String>().toList(),
           'downloadedAt': DateTime.now().millisecondsSinceEpoch,
         };
 
@@ -308,62 +308,18 @@ class OfflinePlaylistService {
   }
 
   Future<void> removeOfflinePlaylist(String playlistId) async {
+    // This function will now only remove the playlist from the "Offline Playlists"
+    // list. It will NOT delete the actual song files. The songs will remain
+    // available in the main "Offline Songs" list and can be managed from there.
+    // This is a safer approach, preventing accidental deletion of songs that might
+    // be part of other playlists or downloaded individually.
     try {
       if (playlistId.isEmpty) {
         logger.log('Invalid playlistId for removal', null, null);
         return;
       }
 
-      // Find the playlist
-      final playlist = offlinePlaylists.value.firstWhere(
-        (playlist) => playlist['ytid'] == playlistId,
-        orElse: () => null,
-      );
-
-      if (playlist == null) {
-        logger.log('Playlist not found for removal: $playlistId', null, null);
-        return;
-      }
-
-      // Get songs that are only in this playlist
-      final songsInPlaylist = playlist['list'] as List<dynamic>? ?? [];
-      for (final song in songsInPlaylist) {
-        try {
-          final songId = song['ytid'] as String?;
-
-          if (songId == null || songId.isEmpty) {
-            continue;
-          }
-
-          // Check if this song is used in other offline playlists
-          final isUsedInOtherPlaylists = offlinePlaylists.value
-              .where((p) => p['ytid'] != playlistId) // Exclude current playlist
-              .any((p) {
-                final playlistSongs = p['list'] as List<dynamic>? ?? [];
-                return playlistSongs.any((s) => s['ytid'] == songId);
-              });
-
-          // Also check if song is in user's liked songs or custom playlists
-          final isInLikedSongs = userLikedSongsList.any(
-            (s) => s['ytid'] == songId,
-          );
-          final isInCustomPlaylists = userCustomPlaylists.value.any((p) {
-            final customPlaylistSongs = p['list'] as List<dynamic>? ?? [];
-            return customPlaylistSongs.any((s) => s['ytid'] == songId);
-          });
-
-          // Only remove if not used elsewhere
-          if (!isUsedInOtherPlaylists &&
-              !isInLikedSongs &&
-              !isInCustomPlaylists) {
-            await removeSongFromOffline(songId, fromPlaylist: true);
-          }
-        } catch (e, stackTrace) {
-          logger.log('Error removing song from offline', e, stackTrace);
-        }
-      }
-
-      // Remove playlist from offline playlists
+      // Remove playlist from the offline playlists metadata list.
       final updatedPlaylists = List<dynamic>.from(offlinePlaylists.value)
         ..removeWhere((p) => p['ytid'] == playlistId);
       offlinePlaylists.value = updatedPlaylists;
@@ -372,6 +328,9 @@ class OfflinePlaylistService {
         'offlinePlaylists',
         offlinePlaylists.value,
       );
+
+      // The individual songs that were part of this playlist remain on the device
+      // and in the main `userOfflineSongs` list.
     } catch (e, stackTrace) {
       logger.log('Error removing offline playlist', e, stackTrace);
     }
