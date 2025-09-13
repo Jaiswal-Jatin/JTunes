@@ -109,3 +109,7 @@ flutter {
     source '../..'
 }
 
+dependencies {
+    implementation "androidx.palette:palette-ktx:1.0.0"
+    implementation "androidx.media:media:1.6.0" // Reverted to general media dependency
+}

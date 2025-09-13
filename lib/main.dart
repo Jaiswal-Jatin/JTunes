@@ -1,6 +1,7 @@
 // ignore_for_file: unused_field, unused_import
 
 import 'dart:async';
+import 'package:home_widget/home_widget.dart';
 
 import 'package:j3tunes/API/musify.dart';
 import 'package:j3tunes/localization/app_localizations.dart';
@@ -22,6 +23,7 @@ import 'package:j3tunes/services/playlist_sharing.dart';
 import 'package:j3tunes/services/router_service.dart';
 import 'package:j3tunes/services/settings_manager.dart';
 import 'package:j3tunes/services/update_manager.dart';
+import 'package:j3tunes/widgets/MusicWidgetProvider.dart';
 import 'package:j3tunes/style/app_themes.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:path_provider/path_provider.dart';
@@ -221,6 +223,14 @@ class _J3TunesState extends State<J3Tunes> with WidgetsBindingObserver {
   }
 }
 
+// Must be a top-level function
+@pragma('vm:entry-point')
+void backgroundCallback(Uri? uri) async {
+  // This function is called when the widget is clicked, but we are using
+  // standard MediaButtonReceiver intents on the native side for controls,
+  // so this callback is mainly for other potential interactions.
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initialisation();
@@ -259,6 +269,9 @@ Future<void> initialisation() async {
         androidStopForegroundOnPause: false,
       ),
     );
+
+    // Initialize our new widget service
+    MusicWidgetService().init();
 
     // Init router
     NavigationManager.instance;
