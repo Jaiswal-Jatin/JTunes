@@ -358,8 +358,16 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                 ),
               ),
           builder: (context, player) {
-            return Scaffold(
-              extendBodyBehindAppBar: true,
+            return GestureDetector(
+              onVerticalDragEnd: (details) {
+                // Swipe down to dismiss
+                if (details.primaryVelocity != null &&
+                    details.primaryVelocity! > 200) {
+                  Navigator.pop(context);
+                }
+              },
+              child: Scaffold(
+                extendBodyBehindAppBar: true,
               appBar: AppBar(
                 backgroundColor: Colors.transparent,
                 elevation: 0,
@@ -505,6 +513,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                           ),
                   ),
                 ],
+              ),
               ),
             );
           },
@@ -789,6 +798,17 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
                           ? CardDisplayMode.lyrics
                           : CardDisplayMode.artwork;
                 });
+              }
+            },
+            onHorizontalDragEnd: (details) {
+              if (details.primaryVelocity == null) return;
+              // Swipe left for next
+              if (details.primaryVelocity! < -200) {
+                audioHandler.skipToNext();
+              }
+              // Swipe right for previous
+              else if (details.primaryVelocity! > 200) {
+                audioHandler.skipToPrevious();
               }
             },
             child: ClipRRect(
