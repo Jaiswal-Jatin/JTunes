@@ -1,5 +1,6 @@
 // ignore_for_file: deprecated_member_use, omit_local_variable_types, unnecessary_lambdas, unawaited_futures, unused_field, unused_import, directives_ordering, require_trailing_commas, prefer_final_in_for_each, unused_element_parameter, prefer_if_elements_to_conditional_expressions
 
+import 'package:carousel_slider/carousel_slider.dart';
 import 'package:j3tunes/services/youtube_service.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:j3tunes/services/data_manager.dart';
@@ -654,19 +655,22 @@ class _HomePageState extends State<HomePage>
           padding: EdgeInsets.symmetric(
             horizontal: showOnlyLiked ? 3 : 6, // Reduced spacing for liked
           ),
-          child: GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => PlaylistPage(
-                  playlistId: playlist['ytid'],
-                  playlistData: showOnlyLiked
-                      ? playlist
-                      : null, // Pass data for liked playlists
+          child: SizedBox(
+            width: height,
+            child: GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PlaylistPage(
+                    playlistId: playlist['ytid'],
+                    playlistData: showOnlyLiked
+                        ? playlist
+                        : null, // Pass data for liked playlists
+                  ),
                 ),
               ),
+              child: _buildPlaylistCardWithOverlay(modifiedPlaylist, height),
             ),
-            child: _buildPlaylistCardWithOverlay(modifiedPlaylist, height),
           ),
         );
       },
@@ -678,77 +682,43 @@ class _HomePageState extends State<HomePage>
     int itemCount,
     double height, {
     bool showOnlyLiked = false,
-  }) {
-    // For favorites section, use regular ListView instead of CarouselView
-    if (showOnlyLiked) {
-      return ListView.builder(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 10), // Reduced padding
-        itemCount: itemCount,
-        itemBuilder: (context, index) {
-          final playlist = playlists[index];
-          String? dynamicPlaylistImage = playlist['image'];
-
-          if (playlist['list'] != null && playlist['list'].isNotEmpty) {
-            final firstSong = playlist['list'][0];
-            dynamicPlaylistImage = firstSong['artUri'] ??
-                firstSong['image'] ??
-                firstSong['highResImage'] ??
-                playlist['image'];
-          }
-
-          final modifiedPlaylist = Map<String, dynamic>.from(playlist);
-          modifiedPlaylist['image'] = dynamicPlaylistImage;
-
-          return Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 4), // Reduced spacing
-            child: GestureDetector(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => PlaylistPage(
-                    playlistId: playlist['ytid'],
-                    playlistData: playlist, // Pass data for liked playlists
-                  ),
-                ),
-              ),
-              child: _buildPlaylistCardWithOverlay(modifiedPlaylist, height),
-            ),
-          );
-        },
-      );
-    }
-
-    // Default CarouselView for suggested playlists
-    return CarouselView.weighted(
-      flexWeights: const <int>[3, 2, 1],
-      itemSnapping: true,
-      onTap: (index) => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              PlaylistPage(playlistId: playlists[index]['ytid']),
-        ),
-      ),
-      children: List.generate(itemCount, (index) {
+  }) {    
+    final items = List.generate(itemCount, (index) {
         final playlist = playlists[index];
-        String? dynamicPlaylistImage = playlist['image'];
+        final modifiedPlaylist = Map<String, dynamic>.from(playlist);
 
-        if (playlist['list'] != null && playlist['list'].isNotEmpty) {
-          final firstSong = playlist['list'][0];
-          dynamicPlaylistImage = firstSong['artUri'] ??
+        if (modifiedPlaylist['list'] != null &&
+            (modifiedPlaylist['list'] as List).isNotEmpty) {
+          final firstSong = (modifiedPlaylist['list'] as List).first;
+          modifiedPlaylist['image'] = firstSong['artUri'] ??
               firstSong['image'] ??
               firstSong['highResImage'] ??
-              playlist['image'];
+              modifiedPlaylist['image'];
         }
 
-        final modifiedPlaylist = Map<String, dynamic>.from(playlist);
-        modifiedPlaylist['image'] = dynamicPlaylistImage;
+        return GestureDetector(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PlaylistPage(
+                playlistId: playlist['ytid'],
+                playlistData: showOnlyLiked ? playlist : null,
+              ),
+            ),
+          ),
+          child: _buildPlaylistCardWithOverlay(modifiedPlaylist, height * 1.2),
+        );
+      });
 
-        return _buildPlaylistCardWithOverlay(modifiedPlaylist, height * 2);
-      }),
+    return CarouselSlider(
+      items: items,
+      options: CarouselOptions(
+        height: height,
+        autoPlay: true,
+        enlargeCenterPage: true,
+        viewportFraction: 0.8,
+        aspectRatio: 16 / 9,
+      ),
     );
   }
 
@@ -1026,7 +996,7 @@ class _HomePageState extends State<HomePage>
                     width: 110, // Reduced width
                     margin: const EdgeInsets.only(right: 8), // Reduced margin
                     child: RepaintBoundary(
-                      key: ValueKey('${keyPrefix}_$ytid}'),
+                      key: ValueKey('${keyPrefix}_${ytid}'),
                       child: _buildSongCard(songWithImage),
                     ),
                   );
@@ -1113,7 +1083,6 @@ class _HomePageState extends State<HomePage>
 
     // Remove playlist title overlay from the card image
     return Container(
-      width: size,
       height: size * 0.75,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
