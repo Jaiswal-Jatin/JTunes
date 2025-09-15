@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use, unawaited_futures
+// ignore_for_file: deprecated_member_use, unawaited_futures, use_super_parameters
 
 /*
  *     Copyright (C) 2025 Valeri Gokadze
@@ -21,6 +21,7 @@
  *     please visit: https://github.com/gokadzev/J3Tunes
  */
 
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -36,134 +37,102 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
-  late AnimationController _logoController;
-  late AnimationController _textController;
+  late AnimationController _controller;
   late AnimationController _particleController;
-  late AnimationController _pulseController;
 
   late Animation<double> _logoScale;
+  late Animation<double> _logoFade;
   late Animation<double> _textFade;
   late Animation<Offset> _textSlide;
   late Animation<double> _particleAnimation;
-  late Animation<double> _pulseAnimation;
+
+  static const _animationDuration = Duration(milliseconds: 1200);
+  static const _splashDuration = Duration(seconds: 3);
 
   @override
   void initState() {
     super.initState();
-
-    // Hide system UI for immersive experience
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
-
     _setupAnimations();
-    _startAnimationSequence();
+    _startAnimationAndNavigation();
   }
 
   void _setupAnimations() {
-    // Logo animations
-    _logoController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
+    // Main controller for logo and text
+    _controller = AnimationController(
+      duration: _animationDuration,
       vsync: this,
     );
 
+    // Logo animations
     _logoScale = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
-        parent: _logoController,
-        curve: Curves.elasticOut,
+        parent: _controller,
+        curve: const Interval(0.0, 0.8, curve: Curves.easeOutBack),
+      ),
+    );
+    _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
       ),
     );
 
-
-    // Text animations
-    _textController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
-
+    // Text and bottom content animations
     _textFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
-        parent: _textController,
-        curve: Curves.easeIn,
+        parent: _controller,
+        curve: const Interval(0.4, 1.0, curve: Curves.easeIn),
       ),
     );
-
     _textSlide = Tween<Offset>(
       begin: const Offset(0, 0.5),
       end: Offset.zero,
     ).animate(
       CurvedAnimation(
-        parent: _textController,
-        curve: Curves.easeOutCubic,
+        parent: _controller,
+        curve: const Interval(0.4, 1.0, curve: Curves.easeOutCubic),
       ),
     );
 
     // Particle animation
     _particleController = AnimationController(
-      duration: const Duration(milliseconds: 3000),
+      duration: const Duration(seconds: 10),
       vsync: this,
     );
-
     _particleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _particleController,
-        curve: Curves.easeInOut,
-      ),
-    );
-
-    // Pulse animation
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
-
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
-      CurvedAnimation(
-        parent: _pulseController,
-        curve: Curves.easeInOut,
-      ),
+      _particleController,
     );
   }
 
-  void _startAnimationSequence() async {
+  void _startAnimationAndNavigation() {
     // Start particle animation immediately
+    _controller.forward();
     _particleController.repeat();
 
-    // Start logo animation
-    await Future.delayed(const Duration(milliseconds: 300));
-    _logoController.forward();
-
-    // Start text animation
-    await Future.delayed(const Duration(milliseconds: 800));
-    _textController.forward();
-
-    // Start pulse animation
-    await Future.delayed(const Duration(milliseconds: 500));
-    _pulseController.repeat(reverse: true);
-
     // Navigate to home after total duration
-    await Future.delayed(const Duration(milliseconds: 2500));
-    _navigateToHome();
+    Future.delayed(_splashDuration, _navigateToHome);
   }
 
   void _navigateToHome() {
-    // Restore system UI
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-
-    // Navigate to home
-    NavigationManager.router.go('/home');
+    if (mounted) {
+      NavigationManager.router.go('/home');
+    }
   }
 
   @override
   void dispose() {
-    _logoController.dispose();
-    _textController.dispose();
+    // Restore system UI before disposing
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _controller.dispose();
     _particleController.dispose();
-    _pulseController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final theme = Theme.of(context);
 
     return Scaffold(
       body: Container(
@@ -174,10 +143,10 @@ class _SplashScreenState extends State<SplashScreen>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.8),
-              Theme.of(context).colorScheme.secondary.withOpacity(0.6),
-              Theme.of(context).colorScheme.tertiary.withOpacity(0.4),
+              Colors.orange,
+              theme.colorScheme.background,
             ],
+            stops: const [0.0, 1.0],
           ),
         ),
         child: Stack(
@@ -189,7 +158,7 @@ class _SplashScreenState extends State<SplashScreen>
                 return CustomPaint(
                   painter: ParticlePainter(
                     animation: _particleAnimation.value,
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withOpacity(0.15),
                   ),
                   size: size,
                 );
@@ -201,215 +170,88 @@ class _SplashScreenState extends State<SplashScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo with animations
-                  AnimatedBuilder(
-                    animation:
-                        Listenable.merge([_logoController, _pulseController]),
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: _logoScale.value * _pulseAnimation.value,
-                        child: Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Colors.white,
-                                Colors.white.withOpacity(0.8),
-                              ],
+                  // Logo
+                  FadeTransition(
+                    opacity: _logoFade,
+                    child: ScaleTransition(
+                      scale: _logoScale,
+                      child: Container(
+                        width: 140,
+                        height: 140,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.25),
+                              blurRadius: 30,
+                              offset: const Offset(0, 15),
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
-                                blurRadius: 20,
-                                offset: const Offset(0, 10),
-                              ),
-                              BoxShadow(
-                                color: Colors.white.withOpacity(0.5),
-                                blurRadius: 15,
-                                offset: const Offset(0, -5),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.music_note,
-                            size: 60,
-                            color: Color(0xFF6366F1), // Indigo color
-                          ),
+                          ],
                         ),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 40),
-
-                  // App name with animation
-                  SlideTransition(
-                    position: _textSlide,
-                    child: FadeTransition(
-                      opacity: _textFade,
-                      child: ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
-                          colors: [Colors.white, Color(0xFFF1F5F9)],
-                        ).createShader(bounds),
-                        child: const Text(
-                          'JTunes',
-                          style: TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 2,
+                        child: ClipOval(
+                          child: Padding(
+                            padding: const EdgeInsets.all(15.0),
+                            child: Image.asset(
+                              'assets/images/JTunes.png',
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
 
-                  // Features text with animation
-            //       SlideTransition(
-            //         position: _textSlide,
-            //         child: FadeTransition(
-            //           opacity: _textFade,
-            //           child: Container(
-            //             padding: const EdgeInsets.symmetric(
-            //               horizontal: 24,
-            //               vertical: 12,
-            //             ),
-            //             decoration: BoxDecoration(
-            //               color: Colors.white.withOpacity(0.1),
-            //               borderRadius: BorderRadius.circular(25),
-            //               border: Border.all(
-            //                 color: Colors.white.withOpacity(0.2),
-            //                 width: 1,
-            //               ),
-            //             ),
-            //             child: Row(
-            //               mainAxisSize: MainAxisSize.min,
-            //               children: [
-            //                 Icon(
-            //                   Icons.audiotrack,
-            //                   color: Colors.white.withOpacity(0.9),
-            //                   size: 20,
-            //                 ),
-            //                 const SizedBox(width: 8),
-            //                 const Text(
-            //                   'Audio',
-            //                   style: TextStyle(
-            //                     color: Colors.white,
-            //                     fontSize: 16,
-            //                     fontWeight: FontWeight.w600,
-            //                   ),
-            //                 ),
-            //                 const SizedBox(width: 16),
-            //                 Container(
-            //                   width: 1,
-            //                   height: 20,
-            //                   color: Colors.white.withOpacity(0.3),
-            //                 ),
-            //                 const SizedBox(width: 16),
-            //                 Icon(
-            //                   Icons.videocam,
-            //                   color: Colors.white.withOpacity(0.9),
-            //                   size: 20,
-            //                 ),
-            //                 const SizedBox(width: 8),
-            //                 const Text(
-            //                   'Video',
-            //                   style: TextStyle(
-            //                     color: Colors.white,
-            //                     fontSize: 16,
-            //                     fontWeight: FontWeight.w600,
-            //                   ),
-            //                 ),
-            //               ],
-            //             ),
-            //           ),
-            //         ),
-            //       ),
-
-            //       const SizedBox(height: 60),
-
-            //       // Creator credit with animation
-            //       SlideTransition(
-            //         position: _textSlide,
-            //         child: FadeTransition(
-            //           opacity: _textFade,
-            //           child: Column(
-            //             children: [
-            //               Text(
-            //                 'Created by',
-            //                 style: TextStyle(
-            //                   color: Colors.white.withOpacity(0.7),
-            //                   fontSize: 14,
-            //                   fontWeight: FontWeight.w400,
-            //                 ),
-            //               ),
-            //               const SizedBox(height: 8),
-            //               Container(
-            //                 padding: const EdgeInsets.symmetric(
-            //                   horizontal: 20,
-            //                   vertical: 10,
-            //                 ),
-            //                 decoration: BoxDecoration(
-            //                   gradient: LinearGradient(
-            //                     colors: [
-            //                       Colors.white.withOpacity(0.15),
-            //                       Colors.white.withOpacity(0.05),
-            //                     ],
-            //                   ),
-            //                   borderRadius: BorderRadius.circular(20),
-            //                   border: Border.all(
-            //                     color: Colors.white.withOpacity(0.2),
-            //                     width: 1,
-            //                   ),
-            //                 ),
-            //                 child: const Text(
-            //                   'Jatin Jaiswal',
-            //                   style: TextStyle(
-            //                     color: Colors.white,
-            //                     fontSize: 18,
-            //                     fontWeight: FontWeight.bold,
-            //                     letterSpacing: 1,
-            //                   ),
-            //                 ),
-            //               ),
-            //             ],
-            //           ),
-            //         ),
-            //       ),
+                  // App Name
+                  FadeTransition(
+                    opacity: _textFade,
+                    child: SlideTransition(
+                      position: _textSlide,
+                      child: const Text(
+                        'JTunes',
+                        style: TextStyle(
+                          fontSize: 52,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 1.5,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black26,
+                              blurRadius: 10,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
 
             // Loading indicator at bottom
             Positioned(
-              bottom: 80,
+              bottom: 50,
               left: 0,
               right: 0,
               child: FadeTransition(
                 opacity: _textFade,
                 child: Column(
                   children: [
-                    SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: SpinKitFadingCircle(
-                        color: Colors.white.withOpacity(0.85),
-                        size: 40,
-                      ),
+                    SpinKitWave(
+                      color: Colors.white.withOpacity(0.8),
+                      size: 30.0,
+                      type: SpinKitWaveType.center,
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Loading your music experience...',
+                    const SizedBox(height: 60),
+                    const Text(
+                      'By Jatin Jaiswal',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white70,
                         fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w300,
                       ),
                     ),
                   ],
@@ -424,36 +266,68 @@ class _SplashScreenState extends State<SplashScreen>
 }
 
 class ParticlePainter extends CustomPainter {
+  final int particleCount;
+  final Random random;
   final double animation;
   final Color color;
 
-  ParticlePainter({required this.animation, required this.color});
+  // Music icons list
+  static const List<IconData> _musicIcons = [
+    Icons.music_note_rounded,
+    Icons.album_rounded,
+    Icons.headset_rounded,
+    Icons.graphic_eq_rounded,
+  ];
+
+  ParticlePainter({
+    required this.animation,
+    required this.color,
+    this.particleCount = 30, // Reduced count for icons
+  }) : random = Random(12345); // Fixed seed for consistent particle placement
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
+    for (int i = 0; i < particleCount; i++) {
+      // Use a consistent random value for each particle
+      final randomX = random.nextDouble();
+      final randomY = random.nextDouble();
+      final randomRadius = random.nextDouble();
+      final randomSpeed = random.nextDouble() * 0.5 + 0.5;
+      final randomIconIndex = random.nextInt(_musicIcons.length);
 
-    final random = Random(42); // Fixed seed for consistent animation
+      final x = randomX * size.width;
+      final y = (randomY * 1.2 - 0.1) *
+          size.height; // Start some particles off-screen
+      final iconSize = (randomRadius * 15) + 15; // Icon size between 15 and 30
 
-    for (int i = 0; i < 50; i++) {
-      final x = random.nextDouble() * size.width;
-      final y = random.nextDouble() * size.height;
-      final radius = random.nextDouble() * 3 + 1;
+      // Animate particles floating upwards
+      final animatedY = (y - (animation * size.height * randomSpeed)) %
+          (size.height * 1.1);
+      final opacity = (1 - (animatedY / (size.height * 1.1))).clamp(0.0, 1.0);
 
-      // Animate particles with floating effect
-      final animatedY = y + sin(animation * 2 * pi + i) * 20;
-      final animatedX = x + cos(animation * 2 * pi + i * 0.5) * 10;
-
-      canvas.drawCircle(
-        Offset(animatedX, animatedY),
-        radius * (0.5 + 0.5 * sin(animation * 2 * pi + i)),
-        paint,
+      // Draw icon instead of circle
+      final icon = _musicIcons[randomIconIndex];
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: String.fromCharCode(icon.codePoint),
+          style: TextStyle(
+            color: color.withOpacity(opacity * 0.3), // More subtle
+            fontSize: iconSize,
+            fontFamily: icon.fontFamily,
+            package: icon.fontPackage,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(x - textPainter.width / 2, animatedY - textPainter.height / 2),
       );
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant ParticlePainter oldDelegate) =>
+      animation != oldDelegate.animation;
 }
