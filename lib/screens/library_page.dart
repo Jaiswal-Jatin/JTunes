@@ -27,7 +27,8 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:j3tunes/main.dart';
 import 'package:j3tunes/extensions/l10n.dart';
-import 'package:j3tunes/services/data_manager.dart' show getLikedPlaylists;
+import 'package:hive/hive.dart';
+import 'package:j3tunes/services/data_manager.dart' hide createCustomPlaylist;
 import 'package:j3tunes/services/playlist_download_service.dart';
 import 'package:j3tunes/services/router_service.dart';
 import 'package:j3tunes/services/settings_manager.dart';
@@ -39,6 +40,7 @@ import 'package:j3tunes/widgets/confirmation_dialog.dart';
 import 'package:j3tunes/widgets/playlist_bar.dart';
 import 'package:j3tunes/widgets/section_header.dart';
 import 'package:j3tunes/services/youtube_service.dart';
+import 'package:j3tunes/main.dart'; // For logger
 
 // Helper to safely convert Map to Map<String, dynamic>
 Map<String, dynamic> safeMapConvert(dynamic map) {
@@ -68,6 +70,9 @@ class LibraryPage extends StatefulWidget {
 }
 
 class _LibraryPageState extends State<LibraryPage> {
+  final GlobalKey<__LikedPlaylistsSectionState> _likedPlaylistsSectionKey =
+      GlobalKey<__LikedPlaylistsSectionState>();
+
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
@@ -77,20 +82,48 @@ class _LibraryPageState extends State<LibraryPage> {
       body: Column(
         children: [
           Expanded(
-            child: SingleChildScrollView(
-              padding: commonSingleChildScrollViewPadding,
-              child: Column(
-                children: <Widget>[
-                  _buildUserPlaylistsSection(primaryColor),
-                  if (!offlineMode.value)
-                    _buildUserLikedPlaylistsSection(primaryColor),
-                ],
+            child: RefreshIndicator(
+              onRefresh: _onRefresh,
+              color: Theme.of(context).colorScheme.primary,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(), // Ensure it's always scrollable
+                padding: commonSingleChildScrollViewPadding,
+                child: Column(
+                  children: <Widget>[
+                    _buildUserPlaylistsSection(primaryColor),
+                    if (!offlineMode.value)
+                      _buildUserLikedPlaylistsSection(primaryColor),
+                  ],
+                ),
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _onRefresh() async {
+    logger.log('Refreshing Library...', null, null);
+
+    // This will trigger a rebuild for any FutureBuilders, like for user-added YouTube playlists.
+    setState(() {
+      // This empty setState call is enough to make FutureBuilders rebuild.
+    });
+
+    // Refresh custom playlists from storage
+    final customPlaylists = await getAllCustomPlaylists();
+    userCustomPlaylists.value = customPlaylists;
+
+    // Refresh offline playlists from storage
+    offlinePlaylistService.offlinePlaylists.value =
+        Hive.box('userNoBackup').get('offlinePlaylists', defaultValue: []);
+
+    // Refresh liked playlists by calling the child's method
+    _likedPlaylistsSectionKey.currentState?.refreshPlaylists();
+
+    // A small delay to give feedback to the user that refresh happened
+    await Future.delayed(const Duration(milliseconds: 300));
   }
 
   Widget _buildUserPlaylistsSection(Color primaryColor) {
@@ -187,15 +220,7 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Widget _buildUserLikedPlaylistsSection(Color primaryColor) {
-    return ValueListenableBuilder(
-      valueListenable: currentLikedPlaylistsLength,
-      builder: (_, value, __) {
-        if (value == 0) {
-          return const SizedBox();
-        }
-        return _LikedPlaylistsSection();
-      },
-    );
+    return _LikedPlaylistsSection(key: _likedPlaylistsSectionKey);
   }
 
   Widget _buildOfflinePlaylistsSection() {
@@ -482,6 +507,8 @@ class _LibraryPageState extends State<LibraryPage> {
 }
 
 class _LikedPlaylistsSection extends StatefulWidget {
+  const _LikedPlaylistsSection({Key? key}) : super(key: key);
+
   @override
   __LikedPlaylistsSectionState createState() => __LikedPlaylistsSectionState();
 }
@@ -493,6 +520,12 @@ class __LikedPlaylistsSectionState extends State<_LikedPlaylistsSection> {
   void initState() {
     super.initState();
     _likedPlaylistsFuture = _loadLikedPlaylistsWithSongs();
+  }
+
+  void refreshPlaylists() {
+    setState(() {
+      _likedPlaylistsFuture = _loadLikedPlaylistsWithSongs();
+    });
   }
 
   Future<List<Map<String, dynamic>>> _loadLikedPlaylistsWithSongs() async {
@@ -523,34 +556,38 @@ class __LikedPlaylistsSectionState extends State<_LikedPlaylistsSection> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SectionHeader(title: context.l10n!.likedPlaylists),
-        FutureBuilder<List<Map<String, dynamic>>>(
-          future: _likedPlaylistsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              logger.log(
-                  'Error in liked playlists section: ${snapshot.error}',
-                  null,
-                  null);
-              return Center(child: Text('Error loading playlists'));
-            } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-              return (context.findAncestorStateOfType<_LibraryPageState>()!)
-                  ._buildPlaylistListView(context, snapshot.data!);
-            } else {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text('No liked playlists found'),
-                ),
-              );
-            }
-          },
-        ),
-      ],
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _likedPlaylistsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          // Don't show anything while loading, to avoid layout jumps.
+          // A shimmer could be placed here if desired.
+          return const SizedBox.shrink();
+        }
+
+        if (snapshot.hasError) {
+          logger.log(
+            'Error in liked playlists section: ${snapshot.error}',
+            null,
+            null,
+          );
+          // Don't show an error, just hide the section.
+          return const SizedBox.shrink();
+        }
+
+        if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+          return Column(
+            children: [
+              SectionHeader(title: context.l10n!.likedPlaylists),
+              (context.findAncestorStateOfType<_LibraryPageState>()!)
+                  ._buildPlaylistListView(context, snapshot.data!),
+            ],
+          );
+        }
+
+        // If there's no data or the list is empty, show nothing.
+        return const SizedBox.shrink();
+      },
     );
   }
 }
