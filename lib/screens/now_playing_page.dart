@@ -1526,7 +1526,11 @@ class _PositionSliderState extends State<PositionSlider> {
                     ],
                   ),
                 ),
-                // Full screen button
+                // Full screen button,
+                Row(
+                  children: [
+
+              
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
@@ -1545,6 +1549,8 @@ class _PositionSliderState extends State<PositionSlider> {
                     constraints: BoxConstraints(minWidth: 32, minHeight: 32),
                   ),
                 ),
+                
+                ]),
               ],
             ),
           ),
@@ -1843,186 +1849,175 @@ class BottomActionsRow extends StatelessWidget {
     final songOfflineStatus =
         ValueNotifier<bool>(isSongAlreadyOffline(audioId));
 
-    final _primaryColor = Colors.white;
-
     return Wrap(
       alignment: WrapAlignment.center,
-      spacing: 8,
+      spacing: 5,
+      runSpacing: 12,
       children: [
-        _buildOfflineButton(songOfflineStatus, _primaryColor),
-        if (!offlineMode.value) _buildAddToPlaylistButton(_primaryColor),
-        if (!offlineMode.value) _buildStartRadioButton(_primaryColor),
+        if (!offlineMode.value) _buildLikeButton(songLikeStatus),
+        if (!offlineMode.value) _buildAddToPlaylistButton(),
+        if (!offlineMode.value) _buildStartRadioButton(),
         StreamBuilder<List<MediaItem>>(
           stream: audioHandler.queue,
           builder: (context, snapshot) {
             if (!isLargeScreen && (snapshot.data?.isNotEmpty ?? false)) {
-              return _buildQueueButton(context, _primaryColor);
+              return _buildQueueButton(context);
             }
             return const SizedBox.shrink();
           },
         ),
-        _buildEqualizerButton(context, _primaryColor),
-        if (!offlineMode.value) ...[
-          _buildSleepTimerButton(context, _primaryColor),
-          _buildLikeButton(songLikeStatus, _primaryColor),
-        ],
+        _buildOfflineButton(songOfflineStatus),
+        if (!offlineMode.value) _buildSleepTimerButton(context),
+        _buildEqualizerButton(context),
       ],
     );
   }
 
-  Widget _buildOfflineButton(ValueNotifier<bool> status, Color primaryColor) {
+  Widget _buildActionButton({
+    required BuildContext context,
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+    Color? iconColor,
+    bool isActive = false,
+    double? size,
+  }) {
+    final _primaryColor = iconColor ?? Colors.white;
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        width: size ?? iconSize + 28,
+        height: size ?? iconSize + 28,
+        decoration: BoxDecoration(
+          color:
+              isActive ? _primaryColor.withOpacity(0.2) : Colors.white.withOpacity(0.1),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withOpacity(0.15), width: 1),
+        ),
+        child: IconButton(
+          icon: Icon(icon, color: _primaryColor),
+          iconSize: iconSize,
+          onPressed: onPressed,
+          splashRadius: (size ?? iconSize + 28) / 2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOfflineButton(ValueNotifier<bool> status) {
     return ValueListenableBuilder<bool>(
       valueListenable: status,
       builder: (_, value, __) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            icon: Icon(
-              value
-                  ? FluentIcons.checkmark_circle_24_filled
-                  : FluentIcons.arrow_download_24_filled,
-              color: primaryColor,
-            ),
-            iconSize: iconSize,
-            onPressed: () {
-              if (value) {
-                removeSongFromOffline(audioId);
-              } else {
-                makeSongOffline(mediaItemToMap(metadata));
-              }
-              status.value = !status.value;
-            },
-          ),
+        return _buildActionButton(
+          context: context,
+          icon: value
+              ? FluentIcons.checkmark_circle_24_filled
+              : FluentIcons.arrow_download_24_filled,
+          tooltip: value ? context.l10n!.removeOffline : context.l10n!.download,
+          isActive: value,
+          onPressed: () {
+            if (value) {
+              removeSongFromOffline(audioId);
+            } else {
+              makeSongOffline(mediaItemToMap(metadata));
+            }
+            status.value = !status.value;
+          },
         );
       },
     );
   }
 
-  Widget _buildAddToPlaylistButton(Color primaryColor) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: Icon(Icons.add, color: primaryColor),
-        iconSize: iconSize,
-        onPressed: () {
-          showAddToPlaylistDialog(context, mediaItemToMap(metadata));
-        },
-      ),
+  Widget _buildAddToPlaylistButton() {
+    return _buildActionButton(
+      context: context,
+      icon: Icons.add,
+      tooltip: context.l10n!.addToPlaylist,
+      onPressed: () {
+        showAddToPlaylistDialog(context, mediaItemToMap(metadata));
+      },
     );
   }
 
-  Widget _buildStartRadioButton(Color primaryColor) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: Icon(FluentIcons.radio_button_24_regular, color: primaryColor),
-        iconSize: iconSize,
-        tooltip: 'Start Radio',
-        onPressed: () {
-          audioHandler.customAction(
-            'startRadio',
-            {'song': mediaItemToMap(metadata)},
-          );
-          showToast(context, 'Starting Radio...');
-        },
-      ),
+  Widget _buildStartRadioButton() {
+    return _buildActionButton(
+      context: context,
+      icon: FluentIcons.music_note_2_24_filled,
+      tooltip: 'Start Radio',
+      onPressed: () {
+        audioHandler.customAction(
+          'startRadio',
+          {'song': mediaItemToMap(metadata)},
+        );
+        showToast(context, 'Starting Radio...');
+      },
     );
   }
 
-  Widget _buildQueueButton(BuildContext context, Color primaryColor) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: Icon(FluentIcons.apps_list_24_filled, color: primaryColor),
-        iconSize: iconSize,
-        onPressed: onQueueButtonPressed,
-      ),
+  Widget _buildQueueButton(BuildContext context) {
+    return _buildActionButton(
+      context: context,
+      icon: FluentIcons.apps_list_24_filled,
+      tooltip: context.l10n!.playlist,
+      onPressed: onQueueButtonPressed,
     );
   }
 
-  Widget _buildEqualizerButton(BuildContext context, Color primaryColor) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: Icon(FluentIcons.options_24_filled, color: primaryColor),
-        iconSize: iconSize,
-        onPressed: () {
-          showEqualizerSheet(context);
-        },
-      ),
+  Widget _buildEqualizerButton(BuildContext context) {
+    return _buildActionButton(
+      context: context,
+      icon: FluentIcons.options_24_filled,
+      tooltip: 'Equalizer',
+      onPressed: () => showEqualizerSheet(context),
     );
   }
 
-  Widget _buildSleepTimerButton(BuildContext context, Color primaryColor) {
+  Widget _buildSleepTimerButton(BuildContext context) {
     return ValueListenableBuilder<Duration?>(
       valueListenable: sleepTimerNotifier,
       builder: (_, value, __) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            icon: Icon(
-              value != null
-                  ? FluentIcons.timer_24_filled
-                  : FluentIcons.timer_24_regular,
-              color: primaryColor,
-            ),
-            iconSize: iconSize,
-            onPressed: () {
-              if (value != null) {
-                audioHandler.cancelSleepTimer();
-                sleepTimerNotifier.value = null;
-                showToast(
-                  context,
-                  context.l10n!.sleepTimerCancelled,
-                  duration: const Duration(seconds: 1, milliseconds: 500),
-                );
-              } else {
-                _showSleepTimerDialog(context);
-              }
-            },
-          ),
+        final isActive = value != null;
+        return _buildActionButton(
+          context: context,
+          icon: isActive
+              ? FluentIcons.timer_24_filled
+              : FluentIcons.timer_24_regular,
+          tooltip:
+              isActive ? context.l10n!.sleepTimerCancelled : context.l10n!.setSleepTimer,
+          isActive: isActive,
+          onPressed: () {
+            if (isActive) {
+              audioHandler.cancelSleepTimer();
+              sleepTimerNotifier.value = null;
+              showToast(
+                context,
+                context.l10n!.sleepTimerCancelled,
+                duration: const Duration(seconds: 1, milliseconds: 500),
+              );
+            } else {
+              _showSleepTimerDialog(context);
+            }
+          },
         );
       },
     );
   }
 
-  Widget _buildLikeButton(ValueNotifier<bool> status, Color primaryColor) {
+  Widget _buildLikeButton(ValueNotifier<bool> status) {
     return ValueListenableBuilder<bool>(
       valueListenable: status,
       builder: (_, value, __) {
-        final icon =
-            value ? FluentIcons.heart_24_filled : FluentIcons.heart_24_regular;
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            icon: Icon(icon, color: primaryColor),
-            iconSize: iconSize,
-            onPressed: () {
-              updateSongLikeStatus(audioId, !status.value);
-              status.value = !status.value;
-            },
-          ),
+        return _buildActionButton(
+          context: context,
+          icon: value ? FluentIcons.heart_24_filled : FluentIcons.heart_24_regular,
+          tooltip: value
+              ? context.l10n!.removeFromLikedSongs
+              : context.l10n!.addToLikedSongs,
+          isActive: value,
+          onPressed: () {
+            updateSongLikeStatus(audioId, !value);
+            status.value = !value;
+          },
         );
       },
     );
