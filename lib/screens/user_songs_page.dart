@@ -223,7 +223,7 @@ class _UserSongsPageState extends State<UserSongsPage> {
       true,
       onPlay: () {
         audioHandler.playPlaylistSong(
-          playlist: activePlaylist != playlist ? playlist : null,
+          playlist: playlist,
           songIndex: index,
         );
       },

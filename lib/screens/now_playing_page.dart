@@ -264,6 +264,25 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     });
   }
 
+  void _showQueueSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return _QueueSheet(scrollController: scrollController);
+          },
+        );
+      },
+    );
+  }
+
   void _toggleVideoMode() async {
     if (_youtubeController != null && _isVideoInitialized) {
       final videoPosition = _youtubeController!.value.position;
@@ -360,10 +379,14 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
           builder: (context, player) {
             return GestureDetector(
               onVerticalDragEnd: (details) {
+                if (details.primaryVelocity == null) return;
                 // Swipe down to dismiss
-                if (details.primaryVelocity != null &&
-                    details.primaryVelocity! > 200) {
+                if (details.primaryVelocity! > 200) {
                   Navigator.pop(context);
+                }
+                // Swipe up to show queue
+                if (details.primaryVelocity! < -200) {
+                  _showQueueSheet(context);
                 }
               },
               child: Scaffold(
@@ -581,6 +604,160 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _QueueSheet extends StatefulWidget {
+  const _QueueSheet({required this.scrollController});
+
+  final ScrollController scrollController;
+
+  @override
+  State<_QueueSheet> createState() => _QueueSheetState();
+}
+
+class _QueueSheetState extends State<_QueueSheet> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToCurrent();
+    });
+  }
+
+  void _scrollToCurrent() {
+    final currentIndex = audioHandler.currentQueueIndex;
+    if (currentIndex != null &&
+        currentIndex > 0 &&
+        widget.scrollController.hasClients) {
+      // Estimate item height. A more complex solution would use GlobalKeys,
+      // but an estimation is simpler and often sufficient for this UI.
+      // SongBar Padding(v:2*2) + Card Margin(b:3) + Card Padding(v:8*2) + Artwork(55) = 78
+      const itemHeight = 78.0;
+      final maxScroll = widget.scrollController.position.maxScrollExtent;
+      final offset = (currentIndex * itemHeight).clamp(0.0, maxScroll);
+
+      widget.scrollController.animateTo(
+        offset,
+        duration: const Duration(milliseconds: 800),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final queue = audioHandler.currentQueue;
+    final currentIndex = audioHandler.currentQueueIndex;
+    final theme = Theme.of(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.85),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Column(
+          children: [
+            // Drag handle
+            Container(
+              width: 40,
+              height: 5,
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.grey[600],
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            // Title
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    context.l10n!.playlist,
+                    style:
+                        theme.textTheme.titleLarge?.copyWith(color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+            // The list
+            Expanded(
+              child: queue.isEmpty
+                  ? Center(
+                      child: Text(
+                        context.l10n!.noSongsInQueue,
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    )
+                  : ReorderableListView.builder(
+                      scrollController: widget.scrollController,
+                      itemCount: queue.length,
+                      proxyDecorator:
+                          (Widget child, int index, Animation<double> animation) {
+                        return Material(
+                          color: Colors.transparent,
+                          child: ScaleTransition(
+                            scale: animation.drive(
+                              Tween<double>(begin: 1.0, end: 1.02)
+                                  .chain(CurveTween(curve: Curves.easeInOut)),
+                            ),
+                            child: child,
+                          ),
+                        );
+                      },
+                      onReorder: (int oldIndex, int newIndex) {
+                        setState(() {
+                          if (oldIndex < newIndex) {
+                            newIndex -= 1;
+                          }
+                          audioHandler.customAction('reorderQueue',
+                              {'oldIndex': oldIndex, 'newIndex': newIndex});
+                        });
+                      },
+                      itemBuilder: (context, index) {
+                        final song = queue[index];
+                        final isCurrent = index == currentIndex;
+
+                        return Dismissible(
+                          key: ValueKey(song['ytid']),
+                          direction: DismissDirection.endToStart,
+                          onDismissed: (direction) {
+                            setState(() {
+                              audioHandler.customAction('removeFromQueue', {'index': index});
+                            });
+                          },
+                          background: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20.0),
+                            child: const Icon(Icons.delete_sweep_rounded, color: Colors.white),
+                          ),
+                          child: SongBar(
+                              song,
+                              false, // clearPlaylist is false
+                              onPlay: () => audioHandler.skipToQueueItem(index),
+                              backgroundColor: isCurrent
+                                  ? theme.colorScheme.primary.withOpacity(0.2)
+                                  : Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

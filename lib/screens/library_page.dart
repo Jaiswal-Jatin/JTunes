@@ -79,26 +79,29 @@ class _LibraryPageState extends State<LibraryPage> {
 
     return Scaffold(
       appBar: AppBar(title: Text(context.l10n!.library)),
-      body: Column(
-        children: [
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _onRefresh,
-              color: Theme.of(context).colorScheme.primary,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(), // Ensure it's always scrollable
-                padding: commonSingleChildScrollViewPadding,
-                child: Column(
-                  children: <Widget>[
-                    _buildUserPlaylistsSection(primaryColor),
-                    if (!offlineMode.value)
-                      _buildUserLikedPlaylistsSection(primaryColor),
-                  ],
+      body: RefreshIndicator(
+        onRefresh: _onRefresh,
+        color: Theme.of(context).colorScheme.primary,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Padding(
+                  padding: commonSingleChildScrollViewPadding,
+                  child: Column(
+                    children: <Widget>[
+                      _buildUserPlaylistsSection(primaryColor),
+                      if (!offlineMode.value)
+                        _buildUserLikedPlaylistsSection(primaryColor),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }

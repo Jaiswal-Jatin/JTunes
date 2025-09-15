@@ -959,6 +959,8 @@ class J3TunesAudioHandler extends BaseAudioHandler {
           replace: true,
           startIndex: songIndex,
         );
+      } else {
+        await skipToQueueItem(songIndex);
       }
     } catch (e, stackTrace) {
       logger.log('Error playing playlist', e, stackTrace);
@@ -1005,6 +1007,12 @@ class J3TunesAudioHandler extends BaseAudioHandler {
     } catch (e, stackTrace) {
       logger.log('Error skipping to song', e, stackTrace);
     }
+  }
+
+  @override
+  Future<void> skipToQueueItem(int index) async {
+    if (index < 0 || index >= _queueList.length) return;
+    await _playFromQueue(index);
   }
 
   @override
