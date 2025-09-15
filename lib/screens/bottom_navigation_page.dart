@@ -163,6 +163,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
           bottomNavigationBar: !isLargeScreen
               ? NavigationBar(
                   selectedIndex: _selectedIndex.value,
+                  height: 60,
                   labelBehavior: languageSetting == const Locale('en', '')
                       ? NavigationDestinationLabelBehavior.onlyShowSelected
                       : NavigationDestinationLabelBehavior.alwaysHide,

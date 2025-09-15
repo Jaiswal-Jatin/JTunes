@@ -148,8 +148,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    const _height = 75.0;
-    const _imageSize = 55.0;
+    const _height = 60.0;
+    const _imageSize = 50.0;
 
     return StreamBuilder<MediaItem?>(
       stream: audioHandler.mediaItem,
@@ -276,11 +276,15 @@ class _MiniPlayerState extends State<MiniPlayer> {
                       children: [
                       // Previous Button
                       Container(
+                        width: 38,
+                        height: 38,
                         decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
                         shape: BoxShape.circle,
                         ),
                         child: IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                         icon: const Icon(FluentIcons.previous_24_filled),
                         color: Colors.white,
                         iconSize: 20,
@@ -291,10 +295,12 @@ class _MiniPlayerState extends State<MiniPlayer> {
                         ),
                       ),
 
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 10),
 
                       // Play/Pause Button
                       Container(
+                        width: 44,
+                        height: 44,
                         decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
@@ -307,21 +313,26 @@ class _MiniPlayerState extends State<MiniPlayer> {
                         ],
                         ),
                         child: PlaybackIconButton(
+                        padding: EdgeInsets.zero,
                         iconColor: Colors.black,
                         backgroundColor: Colors.white,
-                        iconSize: 28,
+                        iconSize: 30,
                         ),
                       ),
 
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 10),
 
                       // Next Button
                       Container(
+                        width: 38,
+                        height: 38,
                         decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
                         shape: BoxShape.circle,
                         ),
                         child: IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                         icon: const Icon(FluentIcons.next_24_filled),
                         color: Colors.white,
                         iconSize: 20,
@@ -332,7 +343,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                         ),
                       ),
 
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       ],
                     ),
                     ],
