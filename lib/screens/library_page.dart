@@ -73,6 +73,16 @@ class _LibraryPageState extends State<LibraryPage> {
   final GlobalKey<__LikedPlaylistsSectionState> _likedPlaylistsSectionKey =
       GlobalKey<__LikedPlaylistsSectionState>();
 
+  String? _getRandomPlaylistImage(List<dynamic> songs) {
+    if (songs.isEmpty) return null;
+    final randomSong = songs[Random().nextInt(songs.length)];
+    final songMap = safeMapConvert(randomSong);
+    return songMap['artUri'] as String? ??
+        songMap['image'] as String? ??
+        songMap['highResImage'] as String? ??
+        songMap['lowResImage'] as String?;
+  }
+
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
@@ -289,18 +299,14 @@ class _LibraryPageState extends State<LibraryPage> {
         final playlist = safeMapConvert(rawPlaylist);
         final borderRadius = getItemBorderRadius(index, playlists.length);
 
-        // Get first song's image from playlist
+        // Get a random song's image from the playlist
         String? dynamicPlaylistImage = playlist['image'];
 
-        // Check if playlist has songs and get first song's image
+        // Check if playlist has songs and get a random song's image
         final playlistSongs = safeListConvert(playlist['list']);
         if (playlistSongs.isNotEmpty) {
-          final randomSong =
-              playlistSongs[Random().nextInt(playlistSongs.length)];
-          dynamicPlaylistImage = randomSong['artUri'] ??
-              randomSong['image'] ??
-              randomSong['highResImage'] ??
-              playlist['image'];
+          dynamicPlaylistImage =
+              _getRandomPlaylistImage(playlistSongs) ?? playlist['image'];
         }
 
         return PlaylistBar(

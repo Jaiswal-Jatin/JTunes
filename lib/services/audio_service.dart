@@ -93,6 +93,7 @@ class J3TunesAudioHandler extends BaseAudioHandler {
 
   final List<Map> _queueList = [];
   final List<Map> _historyList = [];
+  final List<Map> _originalQueueList = [];
   int _currentQueueIndex = 0;
   bool _isLoadingNextSong = false;
 
@@ -388,6 +389,10 @@ class J3TunesAudioHandler extends BaseAudioHandler {
       if (replace) {
         _queueList.clear();
         _currentQueueIndex = 0;
+        if (shuffleNotifier.value) {
+          _originalQueueList.clear();
+          shuffleNotifier.value = false;
+        }
       }
 
       for (final song in songs) {
@@ -683,6 +688,10 @@ class J3TunesAudioHandler extends BaseAudioHandler {
 
       // Clear the queue to enable radio/auto-play mode
       _queueList.clear();
+      if (shuffleNotifier.value) {
+        _originalQueueList.clear();
+        shuffleNotifier.value = false;
+      }
       _queueList.add(song);
       _currentQueueIndex = 0;
 
@@ -1105,8 +1114,34 @@ class J3TunesAudioHandler extends BaseAudioHandler {
   Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
     try {
       final shuffleEnabled = shuffleMode != AudioServiceShuffleMode.none;
+      if (shuffleNotifier.value == shuffleEnabled) return; // Already in desired state
+
+      if (shuffleEnabled) {
+        // Turning ON shuffle
+        if (_queueList.isNotEmpty) {
+          _originalQueueList.clear();
+          _originalQueueList.addAll(_queueList);
+          final currentSong = _queueList.removeAt(_currentQueueIndex);
+          _queueList.shuffle();
+          _queueList.insert(0, currentSong);
+          _currentQueueIndex = 0;
+        }
+      } else {
+        // Turning OFF shuffle
+        if (_originalQueueList.isNotEmpty) {
+          final currentSong = _queueList[_currentQueueIndex];
+          _queueList.clear();
+          _queueList.addAll(_originalQueueList);
+          final newIndex = _queueList.indexWhere((song) => song['ytid'] == currentSong['ytid']);
+          _currentQueueIndex = newIndex != -1 ? newIndex : 0;
+          _originalQueueList.clear();
+        }
+      }
+
       shuffleNotifier.value = shuffleEnabled;
-      await audioPlayer.setShuffleModeEnabled(shuffleEnabled);
+      _updateQueueMediaItems();
+      // The player's shuffle mode should always be off.
+      await audioPlayer.setShuffleModeEnabled(false);
     } catch (e, stackTrace) {
       logger.log('Error setting shuffle mode', e, stackTrace);
     }
