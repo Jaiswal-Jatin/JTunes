@@ -236,7 +236,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
             enableCaption: true,
             captionLanguage: 'en',
             showLiveFullscreenButton: true,
-            hideControls: true,
+            hideControls: false,
             controlsVisibleAtStart: false,
             forceHD: false,
             useHybridComposition: false,

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="icon_background_light">#FFFFFF</color>
-	<color name="ic_launcher_background">#FFFFFF</color>
+    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="default_widget_background">#212121</color>
 </resources>

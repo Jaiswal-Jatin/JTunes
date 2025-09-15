@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">JTunes</string>
+    <string name="widget_description">Displays the current playing song and controls.</string>
+    <string name="album_art_description">Album Art</string>
 </resources>

@@ -28,6 +28,7 @@ class MusicWidgetProvider : HomeWidgetProvider() {
                 // Update text views
                 setTextViewText(R.id.song_title, title)
                 setTextViewText(R.id.artist_name, artist)
+               
 
                 // Update play/pause icon
                 val playPauseIcon = if (isPlaying) R.drawable.ic_pause_white_24dp else R.drawable.ic_play_arrow_white_24dp

@@ -69,16 +69,19 @@ struct MusicWidgetEntryView : View {
                         .cornerRadius(8)
                 }
 
-                VStack(alignment: .leading) {
-                    Text(entry.songTitle)
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                    Text(entry.artistName)
-                        .font(.subheadline)
-                        .foregroundColor(Color.white.opacity(0.7))
-                        .lineLimit(1)
+                VStack {
+                    VStack(alignment: .leading) {
+                        Text(entry.songTitle)
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                        Text(entry.artistName)
+                            .font(.subheadline)
+                            .foregroundColor(Color.white.opacity(0.7))
+                            .lineLimit(1)
+                    }
+                    Spacer()
                 }
                 .padding(.leading, 8)
 
@@ -90,7 +93,7 @@ struct MusicWidgetEntryView : View {
                             .font(.title2)
                             .foregroundColor(.white)
                             .frame(width: 40, height: 40)
-                            .background(Color(red: 0.98, green: 0.55, blue: 0.0).opacity(0.8))
+                            .background(Color.black)
                             .clipShape(Circle())
                     }
                     .buttonStyle(PlainButtonStyle()) // To remove default button styling
@@ -100,7 +103,7 @@ struct MusicWidgetEntryView : View {
                             .font(.title)
                             .foregroundColor(.white)
                             .frame(width: 50, height: 50)
-                            .background(Color(red: 0.98, green: 0.43, blue: 0.0))
+                            .background(Color.black)
                             .clipShape(Circle())
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -110,7 +113,7 @@ struct MusicWidgetEntryView : View {
                             .font(.title2)
                             .foregroundColor(.white)
                             .frame(width: 40, height: 40)
-                            .background(Color(red: 0.98, green: 0.55, blue: 0.0).opacity(0.8))
+                            .background(Color.black)
                             .clipShape(Circle())
                     }
                     .buttonStyle(PlainButtonStyle())
