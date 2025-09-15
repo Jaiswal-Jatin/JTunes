@@ -25,6 +25,7 @@ class SongBar extends StatefulWidget {
     this.isRecentSong,
     this.onRemove,
     this.borderRadius = BorderRadius.zero,
+    this.leading,
     super.key,
   });
 
@@ -37,6 +38,7 @@ class SongBar extends StatefulWidget {
   final bool? isRecentSong;
   final bool showMusicDuration;
   final BorderRadius borderRadius;
+  final Widget? leading;
 
   @override
   State<SongBar> createState() => _SongBarState();
@@ -125,6 +127,8 @@ class _SongBarState extends State<SongBar> {
                 padding: commonBarContentPadding,
                 child: Row(
                   children: [
+                    if (widget.leading != null)
+                      widget.leading!,
                     _buildAlbumArtWithSafeSong(primaryColor, safeSong),
                     const SizedBox(width: 8),
                     Expanded(

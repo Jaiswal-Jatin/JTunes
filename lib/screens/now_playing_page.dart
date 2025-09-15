@@ -533,6 +533,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                             youtubeController: _youtubeController,
                             youtubePlayer: youtubePlayer,
                             isVideoMode: _isVideoMode,
+                            onQueueButtonPressed: () => _showQueueSheet(context),
                           ),
                   ),
                 ],
@@ -654,18 +655,25 @@ class _QueueSheetState extends State<_QueueSheet> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.85),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            theme.colorScheme.surface.withOpacity(0.9),
+            Colors.black.withOpacity(0.95),
+          ],
+        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
         child: Column(
           children: [
             // Drag handle
             Container(
               width: 40,
               height: 5,
-              margin: const EdgeInsets.symmetric(vertical: 10),
+              margin: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.grey[600],
                 borderRadius: BorderRadius.circular(10),
@@ -674,16 +682,28 @@ class _QueueSheetState extends State<_QueueSheet> {
             // Title
             Padding(
               padding:
-                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    context.l10n!.playlist,
-                    style:
-                        theme.textTheme.titleLarge?.copyWith(color: Colors.white),
-                  ),
-                ],
+                  const EdgeInsets.fromLTRB(16.0, 0, 16.0, 8.0),
+              child: Text(
+                context.l10n!.playlist,
+                style: theme.textTheme.titleLarge
+                    ?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const Divider(
+              color: Colors.white24,
+              indent: 16,
+              endIndent: 16,
+              height: 1,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Text(
+                'Drag handle to reorder, swipe left to remove',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withOpacity(0.7),
+                  fontStyle: FontStyle.italic,
+                ),
               ),
             ),
             // The list
@@ -696,17 +716,17 @@ class _QueueSheetState extends State<_QueueSheet> {
                       ),
                     )
                   : ReorderableListView.builder(
+                      padding: const EdgeInsets.fromLTRB(8, 8, 8, 80),
                       scrollController: widget.scrollController,
                       itemCount: queue.length,
                       proxyDecorator:
                           (Widget child, int index, Animation<double> animation) {
                         return Material(
                           color: Colors.transparent,
+                          elevation: 4.0,
                           child: ScaleTransition(
-                            scale: animation.drive(
-                              Tween<double>(begin: 1.0, end: 1.02)
-                                  .chain(CurveTween(curve: Curves.easeInOut)),
-                            ),
+                            scale: animation
+                                .drive(Tween<double>(begin: 1.0, end: 1.05)),
                             child: child,
                           ),
                         );
@@ -733,23 +753,40 @@ class _QueueSheetState extends State<_QueueSheet> {
                             });
                           },
                           background: Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+                            margin: const EdgeInsets.symmetric(vertical: 4.0),
                             decoration: BoxDecoration(
                               color: Colors.redAccent.withOpacity(0.8),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 20.0),
-                            child: const Icon(Icons.delete_sweep_rounded, color: Colors.white),
+                            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: const [
+                                Text(
+                                  'Remove',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                ),
+                                SizedBox(width: 8),
+                                Icon(FluentIcons.delete_24_filled, color: Colors.white),
+                              ],
+                            ),
                           ),
                           child: SongBar(
                               song,
                               false, // clearPlaylist is false
                               onPlay: () => audioHandler.skipToQueueItem(index),
                               backgroundColor: isCurrent
-                                  ? theme.colorScheme.primary.withOpacity(0.2)
-                                  : Colors.white.withOpacity(0.05),
+                                  ? theme.colorScheme.primary.withOpacity(0.25)
+                                  : Colors.white.withOpacity(0.08),
                               borderRadius: BorderRadius.circular(12),
+                              leading: ReorderableDragStartListener(
+                                index: index,
+                                child: const Padding(
+                                  padding: EdgeInsets.only(right: 8.0),
+                                  child: Icon(FluentIcons.re_order_dots_vertical_24_regular, color: Colors.white70),
+                                ),
+                              ),
                             ),
                         );
                       },
@@ -827,6 +864,7 @@ class _MobileLayout extends StatelessWidget {
     required this.youtubeController,
     required this.youtubePlayer,
     required this.isVideoMode,
+    required this.onQueueButtonPressed,
   });
 
   final MediaItem metadata;
@@ -837,6 +875,7 @@ class _MobileLayout extends StatelessWidget {
   final YoutubePlayerController? youtubeController;
   final YoutubePlayer? youtubePlayer;
   final bool isVideoMode;
+  final VoidCallback onQueueButtonPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -867,6 +906,7 @@ class _MobileLayout extends StatelessWidget {
             metadata: metadata,
             iconSize: adjustedMiniIconSize,
             isLargeScreen: isLargeScreen,
+            onQueueButtonPressed: onQueueButtonPressed,
           ),
           const SizedBox(height: 2),
         ],
@@ -1787,6 +1827,7 @@ class BottomActionsRow extends StatelessWidget {
     required this.metadata,
     required this.iconSize,
     required this.isLargeScreen,
+    required this.onQueueButtonPressed,
   });
 
   final BuildContext context;
@@ -1794,6 +1835,7 @@ class BottomActionsRow extends StatelessWidget {
   final MediaItem metadata;
   final double iconSize;
   final bool isLargeScreen;
+  final VoidCallback onQueueButtonPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -1809,8 +1851,16 @@ class BottomActionsRow extends StatelessWidget {
       children: [
         _buildOfflineButton(songOfflineStatus, _primaryColor),
         if (!offlineMode.value) _buildAddToPlaylistButton(_primaryColor),
-        if (activePlaylist['list'].isNotEmpty && !isLargeScreen)
-          _buildQueueButton(context, _primaryColor),
+        if (!offlineMode.value) _buildStartRadioButton(_primaryColor),
+        StreamBuilder<List<MediaItem>>(
+          stream: audioHandler.queue,
+          builder: (context, snapshot) {
+            if (!isLargeScreen && (snapshot.data?.isNotEmpty ?? false)) {
+              return _buildQueueButton(context, _primaryColor);
+            }
+            return const SizedBox.shrink();
+          },
+        ),
         _buildEqualizerButton(context, _primaryColor),
         if (!offlineMode.value) ...[
           _buildSleepTimerButton(context, _primaryColor),
@@ -1867,6 +1917,27 @@ class BottomActionsRow extends StatelessWidget {
     );
   }
 
+  Widget _buildStartRadioButton(Color primaryColor) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: Icon(FluentIcons.radio_button_24_regular, color: primaryColor),
+        iconSize: iconSize,
+        tooltip: 'Start Radio',
+        onPressed: () {
+          audioHandler.customAction(
+            'startRadio',
+            {'song': mediaItemToMap(metadata)},
+          );
+          showToast(context, 'Starting Radio...');
+        },
+      ),
+    );
+  }
+
   Widget _buildQueueButton(BuildContext context, Color primaryColor) {
     return Container(
       decoration: BoxDecoration(
@@ -1876,39 +1947,7 @@ class BottomActionsRow extends StatelessWidget {
       child: IconButton(
         icon: Icon(FluentIcons.apps_list_24_filled, color: primaryColor),
         iconSize: iconSize,
-        onPressed: () {
-          showCustomBottomSheet(
-            context,
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const BouncingScrollPhysics(),
-              padding: commonListViewBottmomPadding,
-              itemCount: activePlaylist['list'].length,
-              itemBuilder: (BuildContext context, int index) {
-                final borderRadius = getItemBorderRadius(
-                  index,
-                  activePlaylist['list'].length,
-                );
-                return Container(
-                  margin: const EdgeInsets.symmetric(vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: borderRadius,
-                  ),
-                  child: SongBar(
-                    activePlaylist['list'][index],
-                    false,
-                    onPlay: () {
-                      audioHandler.playPlaylistSong(songIndex: index);
-                    },
-                    backgroundColor: Colors.transparent,
-                    borderRadius: borderRadius,
-                  ),
-                );
-              },
-            ),
-          );
-        },
+        onPressed: onQueueButtonPressed,
       ),
     );
   }
