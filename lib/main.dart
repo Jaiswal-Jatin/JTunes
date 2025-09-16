@@ -1,6 +1,10 @@
 // ignore_for_file: unused_field, unused_import
 
 import 'dart:async';
+import 'dart:io';
+
+// The window_manager package is required for setting the window size.
+// Add `window_manager: ^0.3.8` to your pubspec.yaml
 import 'package:home_widget/home_widget.dart';
 
 import 'package:j3tunes/API/musify.dart';
@@ -30,6 +34,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:j3tunes/screens/adaptive_layout.dart';
 import 'package:j3tunes/screens/mobile_ui/bottom_navigation_page.dart';
 import 'package:j3tunes/screens/desktop_ui/desktop_scaffold.dart';
+import 'package:window_manager/window_manager.dart';
 
 /// Global notifier for the currently selected song (for instant SongBar update)
 final ValueNotifier<Map<String, dynamic>?> currentSongNotifier = ValueNotifier<Map<String, dynamic>?>(null);
@@ -241,6 +246,31 @@ void backgroundCallback(Uri? uri) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Set minimum window size for desktop platforms.
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+    await windowManager.ensureInitialized();
+
+    // Set the window icon for Windows. This is not supported on macOS.
+    if (Platform.isWindows) {
+      // Make sure to add an icon file (e.g., 'assets/app_icon.ico') to your project's assets.
+      await windowManager.setIcon('assets/app_icon.ico');
+    }
+
+    WindowOptions windowOptions = const WindowOptions(
+      size: Size(1200, 800),
+      center: true,
+      minimumSize: Size(375, 700), // Enforce minimum size
+      backgroundColor: Colors.transparent,
+      skipTaskbar: false,
+      titleBarStyle: TitleBarStyle.normal,
+    );
+    windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
+  }
+
   await initialisation();
 
   // Add these error handlers before runApp

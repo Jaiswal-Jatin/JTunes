@@ -298,157 +298,161 @@ class _DesktopNowPlayingPanelState extends State<DesktopNowPlayingPanel>
             SafeArea(
               child: Column(
                 children: [
-                  // Album Art and Song Info
-                  Expanded(
-                    flex: 4,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        // Always show album art, no video player
-                        Container(
-                          width: 150,
-                          height: 150,
-                          clipBehavior: Clip.antiAlias,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8.0),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.2),
-                              width: 2.0,
+                  // Use a Flexible instead of Expanded for the top part,
+                  // and wrap its content in a SingleChildScrollView to prevent overflow.
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Always show album art, no video player
+                            Container(
+                              width: 150,
+                              height: 150,
+                              clipBehavior: Clip.antiAlias,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8.0),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.2),
+                                  width: 2.0,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.5),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: albumArtUrl.isNotEmpty
+                                  ? CachedNetworkImage(
+                                      imageUrl: albumArtUrl,
+                                      fit: BoxFit.cover,
+                                      placeholder: (context, url) => const Center(
+                                          child: CircularProgressIndicator()),
+                                      errorWidget: (context, url, error) =>
+                                          Container(
+                                              color: Colors.grey[800],
+                                              child: const Icon(Icons.album,
+                                                  size: 100,
+                                                  color: Colors.white54)),
+                                    )
+                                  : Container(
+                                      color: Colors.grey[800],
+                                      child: const Icon(Icons.album,
+                                          size: 100, color: Colors.white54)),
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.5),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: albumArtUrl.isNotEmpty
-                              ? CachedNetworkImage(
-                                  imageUrl: albumArtUrl,
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => const Center(
-                                      child: CircularProgressIndicator()),
-                                  errorWidget: (context, url, error) =>
-                                      Container(
-                                          color: Colors.grey[800],
-                                          child: const Icon(Icons.album,
-                                              size: 100,
-                                              color: Colors.white54)),
-                                )
-                              : Container(
-                                  color: Colors.grey[800],
-                                  child: const Icon(Icons.album,
-                                      size: 100, color: Colors.white54)),
-                        ), // Increased spacing is now handled by spaceEvenly
-                        Padding(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 16.0),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                title,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                artist,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(
-                                        color: Colors.white.withOpacity(0.8)),
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Progress Bar
-                        StreamBuilder<PositionData>(
-                          stream: audioHandler.positionDataStream,
-                          builder: (context, snapshot) {
-                            final hasData =
-                                snapshot.hasData && snapshot.data != null;
-                            final positionData = hasData
-                                ? snapshot.data!
-                                : PositionData(
-                                    Duration.zero, Duration.zero, Duration.zero);
-
-                            final maxDuration =
-                                positionData.duration.inSeconds > 0
-                                    ? positionData.duration.inSeconds.toDouble()
-                                    : 1.0;
-                            final currentValue = _isDragging
-                                ? _dragValue
-                                : positionData.position.inSeconds.toDouble();
-
-                            return Padding(
+                            const SizedBox(height: 24),
+                            Padding(
                               padding:
-                                  const EdgeInsets.symmetric(horizontal: 12.0),
+                                  const EdgeInsets.symmetric(horizontal: 16.0),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  SliderTheme(
-                                    data: SliderTheme.of(context).copyWith(
-                                      activeTrackColor:
-                                          Theme.of(context).colorScheme.primary,
-                                      inactiveTrackColor: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface
-                                          .withOpacity(0.2),
-                                      thumbColor:
-                                          Theme.of(context).colorScheme.primary,
-                                      overlayColor: Theme.of(context)
-                                          .colorScheme
-                                          .primary
-                                          .withOpacity(0.2),
-                                      thumbShape:
-                                          const RoundSliderThumbShape(
-                                              enabledThumbRadius: 6),
-                                      trackHeight: 4.0,
-                                    ),
-                                    child: Slider(
-                                      value: currentValue.clamp(0.0, maxDuration),
-                                      max: maxDuration,
-                                      onChanged: hasData ? (value) { setState(() { _isDragging = true; _dragValue = value; }); } : null,
-                                      onChangeEnd: hasData ? (value) { audioHandler.seek(Duration(seconds: value.toInt())); setState(() { _isDragging = false; }); } : null,
-                                    ),
+                                  Text(
+                                    title,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  _buildPositionRow(context,
-                                      positionData.position, positionData.duration),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    artist,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                            color: Colors.white.withOpacity(0.8)),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ],
                               ),
-                            );
-                          },
+                            ),
+                            const SizedBox(height: 24),
+                            // Progress Bar
+                            StreamBuilder<PositionData>(
+                              stream: audioHandler.positionDataStream,
+                              builder: (context, snapshot) {
+                                final hasData =
+                                    snapshot.hasData && snapshot.data != null;
+                                final positionData = hasData
+                                    ? snapshot.data!
+                                    : PositionData(
+                                        Duration.zero, Duration.zero, Duration.zero);
+
+                                final maxDuration =
+                                    positionData.duration.inSeconds > 0
+                                        ? positionData.duration.inSeconds.toDouble()
+                                        : 1.0;
+                                final currentValue = _isDragging
+                                    ? _dragValue
+                                    : positionData.position.inSeconds.toDouble();
+
+                                return Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 12.0),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SliderTheme(
+                                        data: SliderTheme.of(context).copyWith(
+                                          activeTrackColor:
+                                              Theme.of(context).colorScheme.primary,
+                                          inactiveTrackColor: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withOpacity(0.2),
+                                          thumbColor:
+                                              Theme.of(context).colorScheme.primary,
+                                          overlayColor: Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                              .withOpacity(0.2),
+                                          thumbShape:
+                                              const RoundSliderThumbShape(
+                                                  enabledThumbRadius: 6),
+                                          trackHeight: 4.0,
+                                        ),
+                                        child: Slider(
+                                          value: currentValue.clamp(0.0, maxDuration),
+                                          max: maxDuration,
+                                          onChanged: hasData ? (value) { setState(() { _isDragging = true; _dragValue = value; }); } : null,
+                                          onChangeEnd: hasData ? (value) { audioHandler.seek(Duration(seconds: value.toInt())); setState(() { _isDragging = false; }); } : null,
+                                        ),
+                                      ),
+                                      _buildPositionRow(context,
+                                          positionData.position, positionData.duration),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 8),
+                            // Controls
+                            StreamBuilder<PlaybackState>(
+                              stream: audioHandler.playbackState,
+                              builder: (context, snapshot) {
+                                return _buildControls(context, snapshot.data);
+                              },
+                            ),
+                          ],
                         ),
-                        // Controls
-                        StreamBuilder<PlaybackState>(
-                          stream: audioHandler.playbackState,
-                          builder: (context, snapshot) {
-                            return _buildControls(context, snapshot.data);
-                          },
-                        ),
-                        // const SizedBox(height: 10),
-                        // // Extra controls
-                        // _buildExtraControls(context, metadata),
-                      ],
+                      ),
                     ),
                   ),
                   // Queue and Lyrics (expandable)
                   Expanded(
-                    flex: 5,
                     child: Column(
                       children: [
                         TabBar(

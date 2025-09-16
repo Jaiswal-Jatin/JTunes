@@ -84,7 +84,11 @@ class _DesktopScaffoldState extends State<DesktopScaffold> {
                     duration: const Duration(milliseconds: 300),
                     curve: Curves.easeInOut,
                     width: _isPanelVisible ? _panelWidth : 0,
-                    child: const ClipRect(
+                    // Wrap with a horizontal SingleChildScrollView to prevent
+                    // overflow errors during the animation.
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const NeverScrollableScrollPhysics(),
                       child: SizedBox(
                         width: _panelWidth,
                         child: DesktopNowPlayingPanel(),
