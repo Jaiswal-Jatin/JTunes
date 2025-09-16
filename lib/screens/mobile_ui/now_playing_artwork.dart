@@ -83,9 +83,17 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
         double artworkHeight;
 
         if (mode == CardDisplayMode.video) {
-          // Video mode: 16:9 aspect ratio for both mobile and desktop
-          artworkWidth = screenWidth * 0.9;
-          artworkHeight = artworkWidth * 9 / 16;
+          if (widget.isDesktop) {
+            // For desktop, constrain by height to avoid being too wide,
+            // but don't exceed 90% of width.
+            artworkHeight = screenHeight * 0.5;
+            artworkWidth = (artworkHeight * 16 / 9)
+                .clamp(0, screenWidth * 0.9);
+          } else {
+            // For mobile, constrain by width.
+            artworkWidth = screenWidth * 0.9;
+            artworkHeight = artworkWidth * 9 / 16;
+          }
         } else {
           // Default square size for artwork/lyrics or mobile video
           final imageSize = isLandscape

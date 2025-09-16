@@ -15,6 +15,64 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 import 'package:j3tunes/main.dart';
 
+class _MyYoutubePlayerBuilder extends StatefulWidget {
+  const _MyYoutubePlayerBuilder({
+    this.controller,
+    required this.builder,
+    required this.player,
+  });
+
+  final YoutubePlayerController? controller;
+  final Widget Function(BuildContext, Widget) builder;
+  final Widget player;
+
+  @override
+  State<_MyYoutubePlayerBuilder> createState() => _MyYoutubePlayerBuilderState();
+}
+
+class _MyYoutubePlayerBuilderState extends State<_MyYoutubePlayerBuilder> {
+  late final VoidCallback _listener;
+
+  @override
+  void initState() {
+    super.initState();
+    _listener = () {
+      if (mounted) {
+        setState(() {});
+      }
+    };
+    widget.controller?.addListener(_listener);
+  }
+
+  @override
+  void didUpdateWidget(covariant _MyYoutubePlayerBuilder oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?.removeListener(_listener);
+      widget.controller?.addListener(_listener);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller?.removeListener(_listener);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isFullScreen = widget.controller?.value.isFullScreen ?? false;
+
+    // Only enter fullscreen if we are explicitly in video mode.
+    // This prevents the player from taking over on landscape launch.
+    if (isFullScreen && isVideoModeNotifier.value) {
+      return widget.player;
+    }
+
+    return widget.builder(context, widget.player);
+  }
+}
+
 
 
 /// Call this function instead of Navigator.push to open NowPlayingPage with a smooth slide-up animation.
@@ -239,18 +297,8 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
           ),
         );
 
-        _youtubeController!.addListener(() {
-          if (_youtubeController!.value.isFullScreen) {
-            SystemChrome.setPreferredOrientations([
-              DeviceOrientation.landscapeLeft,
-              DeviceOrientation.landscapeRight,
-            ]);
-          } else {
-            SystemChrome.setPreferredOrientations([
-              DeviceOrientation.portraitUp,
-            ]);
-          }
-        });
+        // The orientation listener is removed to prevent errors on iPad/desktop.
+        // Fullscreen will now respect the device's current orientation.
 
         setState(() {
           _isVideoInitialized = true;
@@ -350,9 +398,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                   playedColor: Theme.of(context).colorScheme.primary,
                   handleColor: Theme.of(context).colorScheme.primary,
                 ),
-                onReady: () {
-                  print('YouTube player is ready');
-                },
+                onReady: () => print('YouTube player is ready'),
                 onEnded: (metaData) {
                   audioHandler.skipToNext();
                   final newVideoId =
@@ -364,14 +410,10 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
               )
             : null;
 
-        return YoutubePlayerBuilder(
-          player: youtubePlayer ??
-              YoutubePlayer(
-                controller: YoutubePlayerController(
-                  initialVideoId: '',
-                  flags: const YoutubePlayerFlags(autoPlay: false),
-                ),
-              ),
+        final dummyController = YoutubePlayerController(initialVideoId: '');
+        return _MyYoutubePlayerBuilder(
+          controller: _youtubeController ?? dummyController,
+          player: youtubePlayer ?? YoutubePlayer(controller: dummyController),
           builder: (context, player) {
             return GestureDetector(
               onVerticalDragEnd: (details) {
