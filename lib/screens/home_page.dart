@@ -725,19 +725,12 @@ class _HomePageState extends State<HomePage>
             _buildSectionHeader(sectionTitle),
             ConstrainedBox(
               constraints: BoxConstraints(maxHeight: adjustedHeight),
-              child: isLargeScreen
-                  ? _buildHorizontalList(
-                      playlists,
-                      itemsNumber,
-                      adjustedHeight,
-                      showOnlyLiked: showOnlyLiked,
-                    )
-                  : _buildCarouselView(
-                      playlists,
-                      itemsNumber,
-                      adjustedHeight,
-                      showOnlyLiked: showOnlyLiked,
-                    ),
+              child: _buildCarouselView(
+                playlists,
+                itemsNumber,
+                adjustedHeight,
+                showOnlyLiked: showOnlyLiked,
+              ),
             ),
           ],
         );
@@ -883,19 +876,12 @@ class _HomePageState extends State<HomePage>
             _buildSectionHeader('Your Liked Playlists'),
             ConstrainedBox(
               constraints: BoxConstraints(maxHeight: playlistHeight),
-              child: isLargeScreen
-                  ? _buildHorizontalList(
-                      playlists,
-                      itemsNumber,
-                      playlistHeight,
-                      showOnlyLiked: true, // This flag differentiates it
-                    )
-                  : _buildCarouselView(
-                      playlists,
-                      itemsNumber,
-                      playlistHeight,
-                      showOnlyLiked: true, // This flag differentiates it
-                    ),
+              child: _buildCarouselView(
+                playlists,
+                itemsNumber,
+                playlistHeight,
+                showOnlyLiked: true, // This flag differentiates it
+              ),
             ),
           ],
         );

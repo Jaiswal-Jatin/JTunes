@@ -26,13 +26,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:j3tunes/API/version.dart';
 import 'package:j3tunes/screens/about_page.dart';
-import 'package:j3tunes/screens/bottom_navigation_page.dart';
+import 'package:j3tunes/screens/adaptive_layout.dart';
+import 'package:j3tunes/screens/mobile_ui/bottom_navigation_page.dart';
 import 'package:j3tunes/screens/home_page.dart';
 import 'package:j3tunes/screens/library_page.dart';
 import 'package:j3tunes/screens/search_page.dart';
 import 'package:j3tunes/screens/settings_page.dart';
 import 'package:j3tunes/screens/user_songs_page.dart';
 import 'package:j3tunes/screens/splash_screen.dart';
+import 'package:j3tunes/screens/desktop_ui/desktop_scaffold.dart';
 import 'package:j3tunes/services/settings_manager.dart';
 
 class NavigationManager {
@@ -57,13 +59,15 @@ class NavigationManager {
       // Main App Routes
       StatefulShellRoute.indexedStack(
         parentNavigatorKey: parentNavigatorKey,
-        branches: !offlineMode.value ? _onlineRoutes() : _offlineRoutes(),
-        pageBuilder: (context, state, navigationShell) {
-          return getPage(
-            child: BottomNavigationPage(child: navigationShell),
-            state: state,
+        builder: (context, state, navigationShell) {
+          return AdaptiveLayout(
+            mobileLayout: (context) =>
+                BottomNavigationPage(child: navigationShell),
+            desktopLayout: (context) =>
+                DesktopScaffold(child: navigationShell),
           );
         },
+        branches: !offlineMode.value ? _onlineRoutes() : _offlineRoutes(),
       ),
     ];
 

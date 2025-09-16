@@ -68,7 +68,10 @@ class _UserSongsPageState extends State<UserSongsPage> {
             ),
         ],
       ),
-      body: _buildCustomScrollView(title, icon, songsList, length),
+      body: LayoutBuilder(builder: (context, constraints) {
+        return _buildCustomScrollView(
+            title, icon, songsList, length, constraints.maxWidth);
+      }),
     );
   }
 
@@ -76,18 +79,14 @@ class _UserSongsPageState extends State<UserSongsPage> {
     setState(() => _isEditEnabled = !_isEditEnabled);
   }
 
-  Widget _buildCustomScrollView(
-    String title,
-    IconData icon,
-    List songsList,
-    ValueNotifier<int> length,
-  ) {
+  Widget _buildCustomScrollView(String title, IconData icon, List songsList,
+      ValueNotifier<int> length, double maxWidth) {
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.all(20),
-            child: buildPlaylistHeader(title, icon, songsList.length),
+            child: buildPlaylistHeader(title, icon, songsList.length, maxWidth),
           ),
         ),
         buildSongList(title, songsList, length),
@@ -131,14 +130,16 @@ class _UserSongsPageState extends State<UserSongsPage> {
     };
   }
 
-  Widget buildPlaylistHeader(String title, IconData icon, int songsLength) {
-    return PlaylistHeader(_buildPlaylistImage(title, icon), title, songsLength);
+  Widget buildPlaylistHeader(
+      String title, IconData icon, int songsLength, double maxWidth) {
+    return PlaylistHeader(
+        _buildPlaylistImage(title, icon, maxWidth), title, songsLength);
   }
 
-  Widget _buildPlaylistImage(String title, IconData icon) {
+  Widget _buildPlaylistImage(String title, IconData icon, double maxWidth) {
     return PlaylistCube(
       {'title': title},
-      size: MediaQuery.sizeOf(context).width / 2.5,
+      size: maxWidth / 2.5,
       cubeIcon: icon,
     );
   }

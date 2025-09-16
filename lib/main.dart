@@ -27,6 +27,9 @@ import 'package:j3tunes/widgets/MusicWidgetProvider.dart';
 import 'package:j3tunes/style/app_themes.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:j3tunes/screens/adaptive_layout.dart';
+import 'package:j3tunes/screens/mobile_ui/bottom_navigation_page.dart';
+import 'package:j3tunes/screens/desktop_ui/desktop_scaffold.dart';
 
 /// Global notifier for the currently selected song (for instant SongBar update)
 final ValueNotifier<Map<String, dynamic>?> currentSongNotifier = ValueNotifier<Map<String, dynamic>?>(null);
@@ -175,6 +178,11 @@ class _J3TunesState extends State<J3Tunes> with WidgetsBindingObserver {
         state == AppLifecycleState.resumed) {
       NavigationManager.router.go('/splash');
     }
+
+    // Refresh audio handler state when app resumes to ensure UI updates
+    if (state == AppLifecycleState.resumed) {
+      audioHandler.customAction('refreshState');
+    }
     _lastLifecycleState = state;
   }
 
@@ -215,7 +223,7 @@ class _J3TunesState extends State<J3Tunes> with WidgetsBindingObserver {
             ],
             supportedLocales: appSupportedLocales,
             locale: languageSetting,
-            routerConfig: NavigationManager.router, // Router automatically starts with /splash
+            routerConfig: NavigationManager.router,
           ),
         );
       },
@@ -271,7 +279,7 @@ Future<void> initialisation() async {
     );
 
     // Initialize our new widget service
-    MusicWidgetService().init();
+    // MusicWidgetService().init(); // Commented out as MusicWidgetExtension is not used for iOS
 
     // Init router
     NavigationManager.instance;

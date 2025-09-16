@@ -23,6 +23,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/services.dart'; // Added for PlatformException
 
 import 'package:j3tunes/API/musify.dart';
 import 'package:audio_service/audio_service.dart';
@@ -61,28 +62,41 @@ class J3TunesAudioHandler extends BaseAudioHandler {
   bool _isPlaylistMode = false;
   String? _currentPlaylistId;
 
+  static const String _userAgent =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36';
+
   J3TunesAudioHandler() {
     audioPlayer = AudioPlayer(
-      audioLoadConfiguration: const AudioLoadConfiguration(
-        androidLoadControl: AndroidLoadControl(
-          maxBufferDuration: Duration(seconds: 60),
-          bufferForPlaybackDuration: Duration(milliseconds: 500),
-          bufferForPlaybackAfterRebufferDuration: Duration(seconds: 3),
-        ),
-      ),
-      audioPipeline: AudioPipeline(
-        androidAudioEffects: [EqualizerService().equalizer],
-      ),
+      userAgent: _userAgent,
+      audioLoadConfiguration: Platform.isAndroid
+          ? const AudioLoadConfiguration(
+              androidLoadControl: AndroidLoadControl(
+                maxBufferDuration: Duration(seconds: 60),
+                bufferForPlaybackDuration: Duration(milliseconds: 500),
+                bufferForPlaybackAfterRebufferDuration: Duration(seconds: 3),
+              ),
+            )
+          : null,
+      audioPipeline: Platform.isAndroid
+          ? AudioPipeline(
+              androidAudioEffects: [
+                if (EqualizerService().equalizer != null)
+                  EqualizerService().equalizer!,
+              ],
+            )
+          : null,
     );
     _setupEventSubscriptions();
     _updatePlaybackState();
 
-    audioPlayer.setAndroidAudioAttributes(
-      const AndroidAudioAttributes(
-        contentType: AndroidAudioContentType.music,
-        usage: AndroidAudioUsage.media,
-      ),
-    );
+    if (Platform.isAndroid) {
+      audioPlayer.setAndroidAudioAttributes(
+        const AndroidAudioAttributes(
+          contentType: AndroidAudioContentType.music,
+          usage: AndroidAudioUsage.media,
+        ),
+      );
+    }
     _initialize();
   }
 
@@ -506,7 +520,6 @@ class J3TunesAudioHandler extends BaseAudioHandler {
 
       if (success) {
         _consecutiveErrors = 0; // Reset error counter on success
-        _preloadUpcomingSongs();
       } else {
         _handlePlaybackError();
       }
@@ -527,8 +540,7 @@ class J3TunesAudioHandler extends BaseAudioHandler {
           if (nextIndex < _queueList.length) {
             final nextSong = _queueList[nextIndex];
             if (nextSong['ytid'] != null && !(nextSong['isOffline'] ?? false)) {
-              // Create preload task with timeout and error handling
-              final preloadTask = _preloadSingleSong(nextSong).timeout(
+              final preloadTask = _getSongUrl(nextSong, false).timeout(
                 const Duration(seconds: 10),
                 onTimeout: () {
                   logger.log(
@@ -536,14 +548,13 @@ class J3TunesAudioHandler extends BaseAudioHandler {
                     null,
                     null,
                   );
-                },
+                }, // Return null on timeout
               ).catchError((e) {
-                // Silently catch and log preload errors to prevent UI lag
                 logger.log(
                   'Error preloading song ${nextSong['ytid']}',
                   e,
                   null,
-                );
+                ); // Return null on error
               });
 
               preloadTasks.add(preloadTask);
@@ -568,32 +579,6 @@ class J3TunesAudioHandler extends BaseAudioHandler {
         logger.log('Error in _preloadUpcomingSongs', e, stackTrace);
       }
     });
-  }
-
-  Future<void> _preloadSingleSong(Map nextSong) async {
-    try {
-      final cacheKey =
-          'song_${nextSong['ytid']}_${audioQualitySetting.value}_url';
-
-      // Check if already cached
-      final cachedUrl = getData('cache', cacheKey);
-      if (cachedUrl.toString().isNotEmpty) {
-        return; // Already cached, skip
-      }
-
-      final url = await getSong(nextSong['ytid'], nextSong['isLive'] ?? false);
-      if (url != null && url.isNotEmpty) {
-        await addOrUpdateData('cache', cacheKey, url);
-        logger.log(
-          'Successfully preloaded song ${nextSong['ytid']}',
-          null,
-          null,
-        );
-      }
-    } catch (e) {
-      // Don't rethrow - let parent handle
-      logger.log('Failed to preload song ${nextSong['ytid']}: $e', null, null);
-    }
   }
 
   // Getters
@@ -772,8 +757,7 @@ class J3TunesAudioHandler extends BaseAudioHandler {
       final cachedUrl = await getData('cache', cacheKey);
       if (cachedUrl != null && cachedUrl is String && cachedUrl.isNotEmpty) {
         if (Uri.tryParse(cachedUrl)?.hasQuery ?? false) {
-          print('[AudioHandler] Using preloaded/cached URL for $songId');
-          unawaited(updateRecentlyPlayed(songId));
+          print('[AudioHandler] Using cached/preloaded URL for $songId');
           return cachedUrl;
         }
       }
@@ -792,8 +776,7 @@ class J3TunesAudioHandler extends BaseAudioHandler {
             final url = track['streamUrl'] ?? track['url'] ?? null;
             logger.log('Fetched stream URL for $songId: $url', null, null);
             if (url != null && url is String && url.isNotEmpty) {
-              await addOrUpdateData('cache', cacheKey, url);
-              unawaited(updateRecentlyPlayed(songId));
+              await addOrUpdateData('cache', cacheKey, url); // Cache it
               return url;
             }
           }
@@ -801,8 +784,7 @@ class J3TunesAudioHandler extends BaseAudioHandler {
         // Fallback to musify.dart getSong if MusicServices fails
         logger.log('Trying musify.getSong fallback for $songId', null, null);
         final fallbackUrl = await getSong(songId, song['isLive'] ?? false);
-        logger.log('musify.getSong fallback URL for $songId: $fallbackUrl',
-            null, null);
+        logger.log('musify.getSong fallback URL for $songId: $fallbackUrl', null, null);
         if (fallbackUrl != null && fallbackUrl.isNotEmpty) {
           await addOrUpdateData('cache', cacheKey, fallbackUrl);
         }
@@ -814,7 +796,7 @@ class J3TunesAudioHandler extends BaseAudioHandler {
         logger.log('Trying musify.getSong fallback after exception for $songId',
             null, null);
         final fallbackUrl = await getSong(songId, song['isLive'] ?? false);
-        logger.log('musify.getSong fallback URL for $songId: $fallbackUrl', null, null);
+        logger.log('musify.getSong fallback URL for $songId: $fallbackUrl', null, null); // Cache fallback URL
         if (fallbackUrl != null && fallbackUrl.isNotEmpty) {
           await addOrUpdateData('cache', cacheKey, fallbackUrl);
         }
@@ -881,21 +863,27 @@ class J3TunesAudioHandler extends BaseAudioHandler {
       await audioPlayer.play();
 
       if (!isOffline) {
-        final cacheKey =
-            'song_${song['ytid']}_${audioQualitySetting.value}_url';
-        unawaited(addOrUpdateData('cache', cacheKey, songUrl));
+        // Update recently played only when the song actually starts playing.
+        unawaited(updateRecentlyPlayed(song['ytid']));
       }
 
       _updatePlaybackState();
 
-      // Start preloading AFTER current song is playing to avoid blocking
+      // Start preloading upcoming songs after the current one starts.
       Future.delayed(const Duration(seconds: 2), _preloadUpcomingSongs);
 
       return true;
-    } catch (e, stackTrace) {
-      logger.log('Error setting audio source', e, stackTrace);
-
-      // Try online fallback for offline songs
+    } on PlatformException catch (e, stackTrace) {
+      logger.log('PlatformException setting audio source: ${e.code} - ${e.message}', e, stackTrace);
+      _lastError = e.toString();
+      // Specific handling for iOS -11828 error
+      if (Platform.isIOS && e.code == '-11828') {
+        logger.log('iOS playback error: Cannot Open. This might be due to unsupported audio format.', null, null);
+        // At this point, selectAudioQuality should have tried to get an MP4.
+        // If it still fails, it means no compatible stream was found or another issue.
+        // Further retry logic could be added here if needed, e.g., trying a different quality.
+      }
+      // Fallback to online for offline songs, or general error handling
       if (isOffline) {
         logger.log('Attempting to play online version as fallback', null, null);
         final onlineUrl = await getSong(song['ytid'], song['isLive'] ?? false);
@@ -916,12 +904,18 @@ class J3TunesAudioHandler extends BaseAudioHandler {
               }
 
               await audioPlayer.play();
+              unawaited(updateRecentlyPlayed(song['ytid']));
               _updatePlaybackState();
 
-              // Start preloading after successful fallback
               Future.delayed(const Duration(seconds: 2), _preloadUpcomingSongs);
 
               return true;
+            } on PlatformException catch (fallbackError, fallbackStackTrace) {
+              logger.log(
+                'Fallback also failed with PlatformException',
+                fallbackError,
+                fallbackStackTrace,
+              );
             } catch (fallbackError, fallbackStackTrace) {
               logger.log(
                 'Fallback also failed',
@@ -932,7 +926,9 @@ class J3TunesAudioHandler extends BaseAudioHandler {
           }
         }
       }
-
+      return false;
+    } catch (e, stackTrace) {
+      logger.log('General error setting audio source', e, stackTrace);
       _lastError = e.toString();
       return false;
     }
@@ -982,24 +978,30 @@ class J3TunesAudioHandler extends BaseAudioHandler {
     bool isOffline,
   ) async {
     try {
-      final tag = mapToMediaItem(song);
+      final mediaItemTag = mapToMediaItem(song);
+      final duration = song['duration'] != null ? Duration(seconds: song['duration'] as int) : null;
 
       if (isOffline) {
-        return AudioSource.file(songUrl, tag: tag);
+        return AudioSource.file(songUrl, tag: mediaItemTag);
       }
 
       final uri = Uri.parse(songUrl);
-      final audioSource = AudioSource.uri(uri, tag: tag);
+      AudioSource audioSource = AudioSource.uri(uri, tag: mediaItemTag);
+
+      // By wrapping the source in a ClippingAudioSource, we provide a hint to
+      // just_audio about the correct duration. This prevents it from
+      // miscalculating the duration from the stream, which fixes the "double duration"
+      // issue and ensures playback completes at the right time.
+      if (duration != null) {
+        audioSource = ClippingAudioSource(child: audioSource as UriAudioSource, end: duration);
+      }
 
       if (!sponsorBlockSupport.value) {
         return audioSource;
       }
 
-      final spbAudioSource = await checkIfSponsorBlockIsAvailable(
-        audioSource,
-        song['ytid'],
-      );
-      return spbAudioSource ?? audioSource;
+      // SponsorBlock logic can be re-integrated here if needed, but for now, the duration fix is primary.
+      return audioSource;
     } catch (e, stackTrace) {
       logger.log('Error building audio source', e, stackTrace);
       return null;
@@ -1246,4 +1248,5 @@ class J3TunesAudioHandler extends BaseAudioHandler {
       logger.log('Error in customAction: $name', e, stackTrace);
     }
   }
+
 }

@@ -19,6 +19,7 @@ class MobileLayout extends StatelessWidget {
     required this.youtubePlayer,
     required this.isVideoMode,
     required this.onQueueButtonPressed,
+    required this.onArtworkTapped,
   });
 
   final MediaItem metadata;
@@ -30,6 +31,7 @@ class MobileLayout extends StatelessWidget {
   final YoutubePlayer? youtubePlayer;
   final bool isVideoMode;
   final VoidCallback onQueueButtonPressed;
+  final VoidCallback onArtworkTapped;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +43,8 @@ class MobileLayout extends StatelessWidget {
           metadata: metadata,
           youtubeController: youtubeController,
           youtubePlayer: youtubePlayer,
+          isDesktop: false,
+          onArtworkTapped: onArtworkTapped,
         ),
         if (!(metadata.extras?['isLive'] ?? false))
           NowPlayingControls(

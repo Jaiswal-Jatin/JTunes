@@ -956,6 +956,18 @@ Future<String?> getSong(String songId, bool isLive) async {
 AudioStreamInfo selectAudioQuality(List<AudioStreamInfo> availableSources) {
   final qualitySetting = settings_manager.audioQualitySetting.value;
 
+  // For iOS, prioritize MP4 streams
+  if (Platform.isIOS) {
+    final mp4Streams = availableSources
+        .where((stream) => stream.container == StreamContainer.mp4)
+        .toList();
+    if (mp4Streams.isNotEmpty) {
+      // Return the highest bitrate MP4 stream
+      return mp4Streams.withHighestBitrate();
+    }
+  }
+
+  // Original logic for other platforms or if no MP4 on iOS
   if (qualitySetting == 'low') {
     return availableSources.last;
   } else if (qualitySetting == 'medium') {

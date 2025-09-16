@@ -39,8 +39,6 @@ class BottomNavigationPage extends StatefulWidget {
 }
 
 class _BottomNavigationPageState extends State<BottomNavigationPage> {
-  final _selectedIndex = ValueNotifier<int>(0);
-
   List<NavigationDestination> _getNavigationDestinations(BuildContext context) {
     return !offlineMode.value
         ? [
@@ -124,36 +122,36 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                         ),
                       )
                       .toList(),
-                  selectedIndex: _selectedIndex.value,
+                  selectedIndex: widget.child.currentIndex,
                   onDestinationSelected: (index) {
                     widget.child.goBranch(
                       index,
                       initialLocation: index == widget.child.currentIndex,
                     );
-                    setState(() {
-                      _selectedIndex.value = index;
-                    });
                   },
                 ),
               Expanded(
-                child: Column(
+                child: Stack(
                   children: [
-                    Expanded(child: widget.child),
-                    StreamBuilder<MediaItem?>(
-                      stream: audioHandler.mediaItem.distinct((prev, curr) {
-                        if (prev == null || curr == null) return false;
-                        return prev.id == curr.id &&
-                            prev.title == curr.title &&
-                            prev.artist == curr.artist &&
-                            prev.artUri == curr.artUri;
-                      }),
-                      builder: (context, snapshot) {
-                        final metadata = snapshot.data;
-                        if (metadata == null) {
-                          return const SizedBox.shrink();
-                        }
-                        return MiniPlayer();
-                      },
+                    widget.child,
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: StreamBuilder<MediaItem?>(
+                        stream: audioHandler.mediaItem.distinct((prev, curr) {
+                          if (prev == null || curr == null) return false;
+                          return prev.id == curr.id &&
+                              prev.title == curr.title &&
+                              prev.artist == curr.artist &&
+                              prev.artUri == curr.artUri;
+                        }),
+                        builder: (context, snapshot) {
+                          final metadata = snapshot.data;
+                          if (metadata == null) {
+                            return const SizedBox.shrink();
+                          }
+                          return MiniPlayer();
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -162,7 +160,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
           ),
           bottomNavigationBar: !isLargeScreen
               ? NavigationBar(
-                  selectedIndex: _selectedIndex.value,
+                  selectedIndex: widget.child.currentIndex,
                   height: 60,
                   labelBehavior: languageSetting == const Locale('en', '')
                       ? NavigationDestinationLabelBehavior.onlyShowSelected
@@ -172,9 +170,6 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                       index,
                       initialLocation: index == widget.child.currentIndex,
                     );
-                    setState(() {
-                      _selectedIndex.value = index;
-                    });
                   },
                   destinations: _getNavigationDestinations(context),
                 )

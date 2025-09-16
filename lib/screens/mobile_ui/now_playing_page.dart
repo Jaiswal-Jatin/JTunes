@@ -1,13 +1,15 @@
 // ignore_for_file: avoid_redundant_argument_values, prefer_const_constructors
 
+import 'package:j3tunes/utilities/responsive.dart';
 import 'dart:ui';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_flip_card/flutter_flip_card.dart';
-import 'package:j3tunes/screens/desktop_layout.dart';
-import 'package:j3tunes/screens/mobile_layout.dart';
-import 'package:j3tunes/screens/queue_sheet.dart';
+import 'package:j3tunes/screens/desktop_ui/desktop_layout.dart';
+import 'package:j3tunes/screens/mobile_ui/mobile_layout.dart';
+import 'package:j3tunes/screens/mobile_ui/queue_sheet.dart';
+
 import 'package:palette_generator/palette_generator.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
@@ -145,19 +147,26 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
   // Helper function to get the best quality image URL
   String? _getBestImageUrl(MediaItem mediaItem) {
     // Priority: highResImage > artUri > lowResImage
+    final ytid = mediaItem.extras?['ytid']?.toString();
     final highResImage = mediaItem.extras?['highResImage']?.toString();
     final artUri = mediaItem.artUri?.toString();
     final lowResImage = mediaItem.extras?['lowResImage']?.toString();
     
-    if (highResImage != null && highResImage.isNotEmpty && highResImage != 'null') {
+    if (highResImage != null && highResImage.isNotEmpty && highResImage != 'null' && highResImage.startsWith('http')) {
       return highResImage;
     }
-    if (artUri != null && artUri.isNotEmpty && artUri != 'null') {
+    if (artUri != null && artUri.isNotEmpty && artUri != 'null' && artUri.startsWith('http')) {
       return artUri;
     }
-    if (lowResImage != null && lowResImage.isNotEmpty && lowResImage != 'null') {
+    if (lowResImage != null && lowResImage.isNotEmpty && lowResImage != 'null' && lowResImage.startsWith('http')) {
       return lowResImage;
     }
+
+    // If all else fails, construct a reliable URL from the video ID
+    if (ytid != null && ytid.isNotEmpty) {
+      return 'https://i.ytimg.com/vi/$ytid/hqdefault.jpg';
+    }
+
     return null;
   }
 
@@ -309,9 +318,9 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final isLargeScreen = size.width > 800;
     const adjustedIconSize = 43.0;
     const adjustedMiniIconSize = 20.0;
+    final isDesktop = Responsive.isDesktop(context);
 
     return StreamBuilder<MediaItem?>(
       stream: audioHandler.mediaItem.distinct((prev, curr) {
@@ -501,7 +510,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
 
                   // Main Content
                   SafeArea(
-                    child: isLargeScreen
+                    child: isDesktop
                         ? DesktopLayout(
                             metadata: metadata,
                             size: size,
@@ -509,18 +518,19 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                             adjustedMiniIconSize: adjustedMiniIconSize,
                             youtubeController: _youtubeController,
                             youtubePlayer: youtubePlayer,
-                            isVideoMode: _isVideoMode,
+                            isVideoMode: _isVideoMode, onArtworkTapped: _toggleVideoMode,
                           )
                         : MobileLayout(
                             metadata: metadata,
                             size: size,
                             adjustedIconSize: adjustedIconSize,
                             adjustedMiniIconSize: adjustedMiniIconSize,
-                            isLargeScreen: isLargeScreen,
+                            isLargeScreen: isDesktop,
                             youtubeController: _youtubeController,
                             youtubePlayer: youtubePlayer,
                             isVideoMode: _isVideoMode,
-                            onQueueButtonPressed: () => _showQueueSheet(context),
+                            onQueueButtonPressed: () =>
+                                _showQueueSheet(context), onArtworkTapped: _toggleVideoMode,
                           ),
                   ),
                 ],

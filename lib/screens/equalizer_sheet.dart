@@ -24,8 +24,33 @@ class _EqualizerSheetState extends State<EqualizerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    if (_equalizerService.equalizer == null) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Equalizer is not available on this platform.',
+              style: Theme.of(context).textTheme.titleLarge,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    }
+
     return FutureBuilder<AndroidEqualizerParameters>(
-      future: _equalizerService.equalizer.parameters,
+      future: _equalizerService.equalizer!.parameters, // Add null check here
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());

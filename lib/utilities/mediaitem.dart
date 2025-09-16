@@ -21,7 +21,7 @@
 
 import 'package:audio_service/audio_service.dart';
 
-Map mediaItemToMap(MediaItem mediaItem) => {
+Map<String, dynamic> mediaItemToMap(MediaItem mediaItem) => {
       'id': mediaItem.id,
       'ytid': mediaItem.extras!['ytid'],
       'album': mediaItem.album.toString(),

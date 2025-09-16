@@ -10,7 +10,7 @@ environment:
 
 dependencies:
   app_links: 
-  audio_service: 
+  audio_service: ^0.18.12
   audio_session: 
   cached_network_image: ^3.3.1
   carousel_slider: ^5.1.1
@@ -30,7 +30,8 @@ dependencies:
   html:
   http:
   intl: 
-  just_audio:
+  just_audio: ^0.9.38
+  just_audio_background: ^0.0.1-beta.15
   rxdart: 
   url_launcher: 
   youtube_explode_dart:
@@ -48,6 +49,7 @@ dependencies:
   shimmer: ^3.0.0
   lottie: ^3.1.0
   flutter_cache_manager: ^3.3.1
+  audio_video_progress_bar: ^2.0.1 # Added for song progress bar
  
 
 dev_dependencies:

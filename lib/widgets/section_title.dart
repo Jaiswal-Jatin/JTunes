@@ -34,18 +34,15 @@ class SectionTitle extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
       child: Align(
         alignment: Alignment.centerLeft,
-        child: SizedBox(
-          width: MediaQuery.sizeOf(context).width * 0.7,
-          child: MarqueeWidget(
-            child: Text(
-              title,
-              style: TextStyle(
-                color: primaryColor,
-                fontSize: fontSize ??
-                    Theme.of(context).textTheme.titleMedium?.fontSize ??
-                    16,
-                fontWeight: FontWeight.bold,
-              ),
+        child: MarqueeWidget(
+          child: Text(
+            title,
+            style: TextStyle(
+              color: primaryColor,
+              fontSize: fontSize ??
+                  Theme.of(context).textTheme.titleMedium?.fontSize ??
+                  16,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),

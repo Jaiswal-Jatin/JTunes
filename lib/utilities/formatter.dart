@@ -59,19 +59,42 @@ Map<String, dynamic> returnSongLayout(
   int index,
   Video song, {
   String? playlistImage,
-}) => {
-  'id': index,
-  'ytid': song.id.toString(),
-  'title': formatSongTitle(
-    song.title.split('-')[song.title.split('-').length - 1],
-  ),
-  'artist': song.title.split('-')[0],
-  'image': playlistImage ?? song.thumbnails.standardResUrl,
-  'lowResImage': playlistImage ?? song.thumbnails.lowResUrl,
-  'highResImage': playlistImage ?? song.thumbnails.maxResUrl,
-  'duration': song.duration?.inSeconds,
-  'isLive': song.isLive,
-};
+}) {
+  // Use song.author for artist, as it's usually the channel name/artist.
+  // Use song.title for title, and then format it.
+  final String rawTitle = song.title;
+  final String rawArtist = song.author;
+
+  // Attempt to extract artist and title more robustly
+  String finalArtist = rawArtist;
+  String finalTitle = rawTitle;
+
+  // Common pattern: "Artist - Song Title"
+  final parts = rawTitle.split(' - ');
+  if (parts.length >= 2) {
+    finalArtist = parts[0].trim();
+    finalTitle = parts.sublist(1).join(' - ').trim();
+  } else {
+    // Fallback: if no hyphen, use author as artist and full title as title
+    finalArtist = rawArtist;
+    finalTitle = rawTitle;
+  }
+
+  // Apply formatSongTitle to the extracted title
+  finalTitle = formatSongTitle(finalTitle);
+
+  return {
+    'id': index,
+    'ytid': song.id.toString(),
+    'title': finalTitle,
+    'artist': finalArtist,
+    'image': playlistImage ?? song.thumbnails.standardResUrl,
+    'lowResImage': playlistImage ?? song.thumbnails.lowResUrl,
+    'highResImage': playlistImage ?? song.thumbnails.maxResUrl,
+    'duration': song.duration?.inSeconds,
+    'isLive': song.isLive,
+  };
+}
 
 String formatDuration(int audioDurationInSeconds) {
   final duration = Duration(seconds: audioDurationInSeconds);

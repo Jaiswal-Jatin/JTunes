@@ -1,10 +1,9 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:j3tunes/screens/mobile_ui/now_playing_artwork.dart';
+import 'package:j3tunes/screens/mobile_ui/now_playing_controls.dart';
+import 'package:j3tunes/screens/mobile_ui/bottom_actions_row.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
-
-import 'now_playing_artwork.dart';
-import 'now_playing_controls.dart';
-import 'queue_list_view.dart';
 
 class DesktopLayout extends StatelessWidget {
   const DesktopLayout({
@@ -16,6 +15,7 @@ class DesktopLayout extends StatelessWidget {
     required this.youtubeController,
     required this.youtubePlayer,
     required this.isVideoMode,
+    required this.onArtworkTapped,
   });
 
   final MediaItem metadata;
@@ -25,6 +25,7 @@ class DesktopLayout extends StatelessWidget {
   final YoutubePlayerController? youtubeController;
   final YoutubePlayer? youtubePlayer;
   final bool isVideoMode;
+  final VoidCallback onArtworkTapped;
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +40,8 @@ class DesktopLayout extends StatelessWidget {
                 metadata: metadata,
                 youtubeController: youtubeController,
                 youtubePlayer: youtubePlayer,
+                isDesktop: true,
+                onArtworkTapped: onArtworkTapped,
               ),
               const SizedBox(height: 5),
               if (!(metadata.extras?['isLive'] ?? false))
@@ -52,11 +55,19 @@ class DesktopLayout extends StatelessWidget {
                   youtubeController: youtubeController,
                   isVideoMode: isVideoMode,
                 ),
+              BottomActionsRow(
+                context: context,
+                audioId: metadata.extras?['ytid'],
+                metadata: metadata,
+                iconSize: adjustedMiniIconSize,
+                isLargeScreen: true, // This hides the queue button on desktop
+                onQueueButtonPressed:
+                    () {}, // Not needed as queue button is hidden
+              ),
+              const SizedBox(height: 20),
             ],
           ),
         ),
-        const VerticalDivider(width: 1),
-        const Expanded(child: QueueListView()),
       ],
     );
   }

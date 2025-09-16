@@ -337,45 +337,47 @@ class _PlaylistPageState extends State<PlaylistPage> {
                 ),
               ),
             )
-          : CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: buildPlaylistHeader(),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 10,
-                      horizontal: 20,
-                    ),
-                    child: buildSongActionsRow(),
-                  ),
-                ),
-                SliverPadding(
-                  padding: commonListViewBottmomPadding,
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (BuildContext context, int index) {
-                        final isRemovable =
-                            _playlist['source'] == 'user-created';
-                        return _buildSongListItem(index, isRemovable);
-                      },
-                      childCount:
-                          _hasMore ? _songsList.length + 1 : _songsList.length,
+          : LayoutBuilder(builder: (context, constraints) {
+              return CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: buildPlaylistHeader(constraints.maxWidth),
                     ),
                   ),
-                ),
-              ],
-            ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 10,
+                        horizontal: 20,
+                      ),
+                      child: buildSongActionsRow(),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: commonListViewBottmomPadding,
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (BuildContext context, int index) {
+                          final isRemovable =
+                              _playlist['source'] == 'user-created';
+                          return _buildSongListItem(index, isRemovable);
+                        },
+                        childCount: _hasMore
+                            ? _songsList.length + 1
+                            : _songsList.length,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }),
     );
   }
 
-  Widget _buildPlaylistImage() {
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final isLandscape = screenWidth > MediaQuery.sizeOf(context).height;
+  Widget _buildPlaylistImage(double maxWidth) {
+    final isLandscape = maxWidth > MediaQuery.sizeOf(context).height;
     // Use first song's image if available
     String? playlistImage = _playlist['image'];
     if (_playlist['list'] != null &&
@@ -393,16 +395,16 @@ class _PlaylistPageState extends State<PlaylistPage> {
     playlistForCube['image'] = playlistImage;
     return PlaylistCube(
       playlistForCube,
-      size: isLandscape ? 300 : screenWidth / 2.5,
+      size: isLandscape ? 300 : maxWidth / 2.5,
       cubeIcon: widget.cubeIcon,
     );
   }
 
-  Widget buildPlaylistHeader() {
+  Widget buildPlaylistHeader(double maxWidth) {
     final _songsLength = _playlist['list'].length;
 
     return PlaylistHeader(
-      _buildPlaylistImage(),
+      _buildPlaylistImage(maxWidth),
       _playlist['title'],
       _songsLength,
     );

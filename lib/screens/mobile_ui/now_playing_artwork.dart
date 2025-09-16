@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:j3tunes/API/musify.dart';
 import 'package:j3tunes/extensions/l10n.dart';
 import 'package:j3tunes/main.dart';
-import 'package:j3tunes/screens/now_playing_page.dart';
+import 'package:j3tunes/screens/mobile_ui/now_playing_page.dart';
 import 'package:j3tunes/services/settings_manager.dart';
 import 'package:j3tunes/widgets/spinner.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
@@ -19,12 +19,16 @@ class NowPlayingArtwork extends StatefulWidget {
     required this.metadata,
     required this.youtubeController,
     required this.youtubePlayer,
+    this.isDesktop = false,
+    this.onArtworkTapped,
   });
 
   final Size size;
   final MediaItem metadata;
   final YoutubePlayerController? youtubeController;
   final YoutubePlayer? youtubePlayer;
+  final bool isDesktop;
+  final VoidCallback? onArtworkTapped;
 
   @override
   State<NowPlayingArtwork> createState() => _NowPlayingArtworkState();
@@ -34,19 +38,26 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
   // Helper function to get the best quality image URL
   String? _getBestImageUrl(MediaItem mediaItem) {
     // Priority: highResImage > artUri > lowResImage
+    final ytid = mediaItem.extras?['ytid']?.toString();
     final highResImage = mediaItem.extras?['highResImage']?.toString();
     final artUri = mediaItem.artUri?.toString();
     final lowResImage = mediaItem.extras?['lowResImage']?.toString();
     
-    if (highResImage != null && highResImage.isNotEmpty && highResImage != 'null') {
+    if (highResImage != null && highResImage.isNotEmpty && highResImage != 'null' && highResImage.startsWith('http')) {
       return highResImage;
     }
-    if (artUri != null && artUri.isNotEmpty && artUri != 'null') {
+    if (artUri != null && artUri.isNotEmpty && artUri != 'null' && artUri.startsWith('http')) {
       return artUri;
     }
-    if (lowResImage != null && lowResImage.isNotEmpty && lowResImage != 'null') {
+    if (lowResImage != null && lowResImage.isNotEmpty && lowResImage != 'null' && lowResImage.startsWith('http')) {
       return lowResImage;
     }
+
+    // If all else fails, construct a reliable URL from the video ID
+    if (ytid != null && ytid.isNotEmpty) {
+      return 'https://i.ytimg.com/vi/$ytid/hqdefault.jpg';
+    }
+
     return null;
   }
 
@@ -54,12 +65,6 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
   Widget build(BuildContext context) {
     const _padding = 50;
     const _radius = 20.0;
-    final screenWidth = widget.size.width;
-    final screenHeight = widget.size.height;
-    final isLandscape = screenWidth > screenHeight;
-    final imageSize = isLandscape
-        ? screenHeight * 0.40
-        : (screenWidth + screenHeight) / 3.35 - _padding;
 
     const lyricsTextStyle = TextStyle(
       fontSize: 24,
@@ -67,85 +72,101 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
       color: Colors.white,
     );
 
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Overlay behind the artwork for separation from blurred background
-        Container(
-          width: imageSize + 32,
-          height: imageSize + 32,
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.45),
-            borderRadius: BorderRadius.circular(_radius + 16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.5),
-                blurRadius: 32,
-                offset: const Offset(0, 12),
-                spreadRadius: 4,
+    return ValueListenableBuilder<CardDisplayMode>(
+      valueListenable: cardModeNotifier,
+      builder: (context, mode, _) {
+        final screenWidth = widget.size.width;
+        final screenHeight = widget.size.height;
+        final isLandscape = screenWidth > screenHeight;
+
+        double artworkWidth;
+        double artworkHeight;
+
+        if (mode == CardDisplayMode.video) {
+          // Video mode: 16:9 aspect ratio for both mobile and desktop
+          artworkWidth = screenWidth * 0.9;
+          artworkHeight = artworkWidth * 9 / 16;
+        } else {
+          // Default square size for artwork/lyrics or mobile video
+          final imageSize = isLandscape
+              ? screenHeight * 0.40
+              : (screenWidth + screenHeight) / 3.35 - _padding;
+          artworkWidth = imageSize;
+          artworkHeight = imageSize;
+        }
+
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            // Overlay behind the artwork for separation from blurred background
+            Container(
+              width: artworkWidth + 32,
+              height: artworkHeight + 32,
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.45),
+                borderRadius: BorderRadius.circular(_radius + 16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.5),
+                    blurRadius: 32,
+                    offset: const Offset(0, 12),
+                    spreadRadius: 4,
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(_radius),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.18),
-              width: 2.2,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.4),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-                spreadRadius: 2,
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(_radius),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.18),
+                  width: 2.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.4),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                    spreadRadius: 2,
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: GestureDetector(
-            onTap: () {
-              if (!offlineMode.value) {
-                setState(() {
-                  cardModeNotifier.value =
-                      cardModeNotifier.value == CardDisplayMode.artwork
-                          ? CardDisplayMode.lyrics
-                          : CardDisplayMode.artwork;
-                });
-              }
-            },
-            onHorizontalDragEnd: (details) {
-              if (details.primaryVelocity == null) return;
-              // Swipe left for next
-              if (details.primaryVelocity! < -200) {
-                audioHandler.skipToNext();
-              }
-              // Swipe right for previous
-              else if (details.primaryVelocity! > 200) {
-                audioHandler.skipToPrevious();
-              }
-            },
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(_radius),
-              child: SizedBox(
-                width: imageSize,
-                height: imageSize,
-                child: ValueListenableBuilder<CardDisplayMode>(
-                  valueListenable: cardModeNotifier,
-                  builder: (context, mode, child) {
-                    return _buildCardContent(
-                        imageSize, _radius, lyricsTextStyle, mode);
-                  },
+              child: GestureDetector(
+                onTap: () {
+                  // On both desktop and mobile, tap toggles video mode if available.
+                  if (widget.youtubeController != null) {
+                    widget.onArtworkTapped?.call();
+                  }
+                },
+                onHorizontalDragEnd: (details) {
+                  if (details.primaryVelocity == null) return;
+                  // Swipe left for next
+                  if (details.primaryVelocity! < -200) {
+                    audioHandler.skipToNext();
+                  }
+                  // Swipe right for previous
+                  else if (details.primaryVelocity! > 200) {
+                    audioHandler.skipToPrevious();
+                  }
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(_radius),
+                  child: SizedBox(
+                    width: artworkWidth,
+                    height: artworkHeight,
+                    child: _buildCardContent(artworkWidth, artworkHeight,
+                        _radius, lyricsTextStyle, mode),
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildCardContent(double imageSize, double radius,
+  Widget _buildCardContent(double imageWidth, double imageHeight, double radius,
       TextStyle lyricsTextStyle, CardDisplayMode mode) {
     switch (mode) {
       case CardDisplayMode.artwork:
@@ -159,11 +180,11 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
             child: imageUrl != null && imageUrl.isNotEmpty
                 ? CachedNetworkImage(
                     imageUrl: imageUrl,
-                    width: imageSize,
-                    height: imageSize,
+                    width: imageWidth,
+                    height: imageHeight,
                     fit: BoxFit.cover,
-                    memCacheWidth: (imageSize * 6).toInt(),
-                    memCacheHeight: (imageSize * 6).toInt(),
+                    memCacheWidth: (imageWidth * 6).toInt(),
+                    memCacheHeight: (imageHeight * 6).toInt(),
                     filterQuality: FilterQuality.high,
                     placeholder: (context, url) => Center(
                       child: SizedBox(
@@ -178,23 +199,23 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
                     errorWidget: (context, url, error) => Image.asset(
                       'assets/images/JTunes.png',
                       fit: BoxFit.cover,
-                      width: imageSize,
-                      height: imageSize,
+                      width: imageWidth,
+                      height: imageHeight,
                     ),
                   )
                 : Image.asset(
                     'assets/images/JTunes.png',
                     fit: BoxFit.cover,
-                    width: imageSize,
-                    height: imageSize,
+                    width: imageWidth,
+                    height: imageHeight,
                   ),
           ),
         );
 
       case CardDisplayMode.lyrics:
         return Container(
-          width: imageSize,
-          height: imageSize,
+          width: imageWidth,
+          height: imageHeight,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
@@ -248,8 +269,8 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
 
       case CardDisplayMode.video:
         return Container(
-          width: imageSize,
-          height: imageSize,
+          width: imageWidth,
+          height: imageHeight,
           decoration: BoxDecoration(
             color: Colors.black,
             borderRadius: BorderRadius.circular(radius),

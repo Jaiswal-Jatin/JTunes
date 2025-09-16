@@ -21,11 +21,12 @@
  *     please visit: https://github.com/gokadzev/J3Tunes
  */
 
+import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:j3tunes/main.dart';
-import 'package:j3tunes/screens/now_playing_page.dart';
+import 'package:j3tunes/screens/mobile_ui/now_playing_page.dart';
 import 'package:j3tunes/widgets/marque.dart';
 import 'package:j3tunes/widgets/playback_icon_button.dart';
 import 'package:j3tunes/widgets/song_artwork.dart';
@@ -75,7 +76,9 @@ void showNowPlayingPage(BuildContext context) {
 }
 
 class MiniPlayer extends StatefulWidget {
-  const MiniPlayer({super.key});
+  const MiniPlayer({super.key, this.isDesktop = false});
+
+  final bool isDesktop;
 
   @override
   State<MiniPlayer> createState() => _MiniPlayerState();
@@ -85,12 +88,13 @@ class _MiniPlayerState extends State<MiniPlayer> {
   final ValueNotifier<Color?> _dominantColorNotifier =
       ValueNotifier<Color?>(null);
   String? _dominantColorImageUrl;
+  StreamSubscription<MediaItem?>? _mediaItemSubscription;
+  bool _isInitialColorUpdateDone = false;
 
   @override
   void initState() {
     super.initState();
-    // Listen to mediaItem changes for color updates
-    audioHandler.mediaItem.listen((mediaItem) {
+    _mediaItemSubscription = audioHandler.mediaItem.listen((mediaItem) {
       if (mediaItem != null) {
         final imageUrl = mediaItem.artUri?.toString();
         if (imageUrl != null && imageUrl != _dominantColorImageUrl) {
@@ -98,14 +102,20 @@ class _MiniPlayerState extends State<MiniPlayer> {
         }
       }
     });
+  }
 
-    // Get current song immediately for instant color update
-    final currentMediaItem = audioHandler.mediaItem.valueOrNull;
-    if (currentMediaItem != null) {
-      final imageUrl = currentMediaItem.artUri?.toString();
-      if (imageUrl != null) {
-        _updateDominantColor(imageUrl);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInitialColorUpdateDone) {
+      final currentMediaItem = audioHandler.mediaItem.valueOrNull;
+      if (currentMediaItem != null) {
+        final imageUrl = currentMediaItem.artUri?.toString();
+        if (imageUrl != null) {
+          _updateDominantColor(imageUrl);
+        }
       }
+      _isInitialColorUpdateDone = true;
     }
   }
 
@@ -119,6 +129,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
       return;
     }
 
+    if (!mounted) return;
     // Set a default color immediately for instant feedback
     _dominantColorNotifier.value = Theme.of(context).colorScheme.surface;
     _dominantColorImageUrl = imageUrl;
@@ -130,6 +141,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
         maximumColorCount: 8, // Reduced colors for faster processing
       );
 
+      if (!mounted) return;
+
       Color? color = palette.vibrantColor?.color ??
           palette.dominantColor?.color ??
           palette.darkVibrantColor?.color ??
@@ -139,6 +152,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
       _miniPlayerColorCache[imageUrl] = color;
       _dominantColorNotifier.value = color;
     } catch (e) {
+      if (!mounted) return;
       // Keep the default color if extraction fails
       final defaultColor = Theme.of(context).colorScheme.surface;
       _miniPlayerColorCache[imageUrl] = defaultColor;
@@ -164,30 +178,30 @@ class _MiniPlayerState extends State<MiniPlayer> {
           builder: (context, dominantColor, _) {
             return GestureDetector(
               onTap: () => showNowPlayingPage(context),
-              onVerticalDragEnd: (details) {
-                if (details.primaryVelocity! < -300) { // Swipe up
-                  showNowPlayingPage(context);
-                } else if (details.primaryVelocity! > 300) { // Swipe down
-                  audioHandler.stop();
-                  audioHandler.updateQueue([]);
-                }
-              },
+              onVerticalDragEnd: widget.isDesktop
+                  ? null
+                  : (details) {
+                      if (details.primaryVelocity! < -300) { // Swipe up
+                        showNowPlayingPage(context);
+                      } else if (details.primaryVelocity! > 300) { // Swipe down
+                        audioHandler.stop();
+                        audioHandler.updateQueue([]);
+                      }
+                    },
               child: Container(
                 height: _height,
-                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                margin: EdgeInsets.symmetric(
+                    horizontal: widget.isDesktop ? 16 : 8, vertical: widget.isDesktop ? 30 : 8),
                 width: double.infinity,
                 decoration: BoxDecoration(
                 gradient: LinearGradient(
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
                 colors: [
-                  dominantColor?.withOpacity(0.9) ??
+                  dominantColor ??
                     Theme.of(context).colorScheme.surface,
-                  dominantColor?.withOpacity(0.7) ??
-                    Theme.of(context)
-                      .colorScheme
-                      .surface
-                      .withOpacity(0.8),
+                  dominantColor ??
+                    Theme.of(context).colorScheme.surface,
                 ],
                 ),
                 borderRadius: BorderRadius.circular(12),
@@ -207,7 +221,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                     children: [
                     // Song Artwork
                     Padding(
-                      padding: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(5),
                       child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: SongArtworkWidget(
