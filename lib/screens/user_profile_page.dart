@@ -274,15 +274,19 @@ class _UserProfilePageState extends State<UserProfilePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildStatItem(
-                'Member Since',
-                _formatDate(userProfile!.createdAt),
-                FluentIcons.calendar_24_regular,
+              Flexible(
+                child: _buildStatItem(
+                  'Member Since',
+                  _formatDate(userProfile!.createdAt),
+                  FluentIcons.calendar_24_regular,
+                ),
               ),
-              _buildStatItem(
-                'Profile Complete',
-                '${_calculateProfileCompletion()}%',
-                FluentIcons.checkmark_circle_24_regular,
+              Flexible(
+                child: _buildStatItem(
+                  'Profile Complete',
+                  '${_calculateProfileCompletion()}%',
+                  FluentIcons.checkmark_circle_24_regular,
+                ),
               ),
             ],
           ),
@@ -307,6 +311,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
             fontWeight: FontWeight.bold,
             color: Theme.of(context).colorScheme.onSurface,
           ),
+          overflow: TextOverflow.ellipsis,
         ),
         Text(
           label,
@@ -314,6 +319,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
             fontSize: 12,
             color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
           ),
+          textAlign: TextAlign.center,
         ),
       ],
     );

@@ -1122,7 +1122,7 @@ class _HomePageState extends State<HomePage>
         audioHandler.playSong(song);
       },
       child: SizedBox(
-        width: 110,
+        width: (MediaQuery.of(context).size.width / 3.8).clamp(100.0, 120.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

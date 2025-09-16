@@ -745,11 +745,12 @@ class _PlaylistPageState extends State<PlaylistPage> {
   }
 
   Widget buildSongActionsRow() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+    return Wrap(
+      alignment: WrapAlignment.end,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 10,
       children: [
         _buildSortSongActionButton(),
-        const SizedBox(width: 10),
         ElevatedButton(
           onPressed: () {
             if (_playlist != null &&

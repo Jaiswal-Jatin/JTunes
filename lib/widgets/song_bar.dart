@@ -395,7 +395,7 @@ class _SongBarState extends State<SongBar> {
         value: 'start_radio',
         child: Row(
           children: [
-            Icon(FluentIcons.music_note_2_24_filled, color: primaryColor),
+            Icon(Icons.radio, color: primaryColor),
             const SizedBox(width: 8),
             const Text('Start Radio'),
           ],

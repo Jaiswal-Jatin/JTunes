@@ -128,7 +128,7 @@ class BottomActionsRow extends StatelessWidget {
   Widget _buildStartRadioButton() {
     return _buildActionButton(
       context: context,
-      icon: FluentIcons.music_note_2_24_filled,
+      icon: Icons.radio,
       tooltip: 'Start Radio',
       onPressed: () {
         audioHandler.customAction(

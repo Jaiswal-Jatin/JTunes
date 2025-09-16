@@ -68,6 +68,10 @@ class J3TunesAudioHandler extends BaseAudioHandler {
   J3TunesAudioHandler() {
     audioPlayer = AudioPlayer(
       userAgent: _userAgent,
+      // For macOS, if you encounter "SocketException: Failed to create server socket",
+      // you can try disabling the local HTTP proxy by setting useProxy to false.
+      // Note: Disabling the proxy might affect certain functionalities like SponsorBlock.
+      // The 'useProxy' parameter is not available in just_audio ^0.10.5.
       audioLoadConfiguration: Platform.isAndroid
           ? const AudioLoadConfiguration(
               androidLoadControl: AndroidLoadControl(
@@ -117,8 +121,8 @@ class J3TunesAudioHandler extends BaseAudioHandler {
   static const int _maxConsecutiveErrors = 3;
 
   // Performance constants
-  static const int _maxHistorySize = 50;
-  static const int _queueLookahead = 3;
+  static const int _maxHistorySize = 50; // Keep history size
+  static const int _queueLookahead = 2; // Preload next 2 songs
   static const Duration _errorRetryDelay = Duration(seconds: 2);
   static const Duration _songTransitionTimeout = Duration(seconds: 30);
 
@@ -533,7 +537,7 @@ class J3TunesAudioHandler extends BaseAudioHandler {
     // Don't block UI - run preloading in background without awaiting
     Future.microtask(() async {
       try {
-        final preloadTasks = <Future<void>>[];
+        final preloadTasks = <Future<String?>>[];
 
         for (var i = 1; i <= _queueLookahead; i++) {
           final nextIndex = _currentQueueIndex + i;
@@ -568,11 +572,11 @@ class J3TunesAudioHandler extends BaseAudioHandler {
             const Duration(seconds: 15),
             onTimeout: () {
               logger.log('Preloading batch timeout', null, null);
-              return <void>[];
+              return <String?>[];
             },
           ).catchError((e) {
             logger.log('Error in preload batch', e, null);
-            return <void>[];
+            return <String?>[];
           });
         }
       } catch (e, stackTrace) {
@@ -753,7 +757,8 @@ class J3TunesAudioHandler extends BaseAudioHandler {
       return _getOfflineSongUrl(song);
     } else {
       // 1. Check cache first for speed
-      final cacheKey = 'song_${songId}_${audioQualitySetting.value}_url';
+      final platformSuffix = Platform.isMacOS ? '_macos' : '';
+      final cacheKey = 'song_${songId}_${audioQualitySetting.value}_url$platformSuffix';
       final cachedUrl = await getData('cache', cacheKey);
       if (cachedUrl != null && cachedUrl is String && cachedUrl.isNotEmpty) {
         if (Uri.tryParse(cachedUrl)?.hasQuery ?? false) {
@@ -877,8 +882,8 @@ class J3TunesAudioHandler extends BaseAudioHandler {
       logger.log('PlatformException setting audio source: ${e.code} - ${e.message}', e, stackTrace);
       _lastError = e.toString();
       // Specific handling for iOS -11828 error
-      if (Platform.isIOS && e.code == '-11828') {
-        logger.log('iOS playback error: Cannot Open. This might be due to unsupported audio format.', null, null);
+      if ((Platform.isIOS || Platform.isMacOS) && e.code == '-11828') {
+        logger.log('Apple platform playback error: Cannot Open. This might be due to unsupported audio format (e.g., webm).', null, null);
         // At this point, selectAudioQuality should have tried to get an MP4.
         // If it still fails, it means no compatible stream was found or another issue.
         // Further retry logic could be added here if needed, e.g., trying a different quality.

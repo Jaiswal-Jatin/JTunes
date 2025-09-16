@@ -905,8 +905,9 @@ Future<String?> getSong(String songId, bool isLive) async {
     }
 
     const _cacheDuration = Duration(hours: 3);
+    final platformSuffix = Platform.isMacOS ? '_macos' : '';
     final cacheKey =
-        'song_${songId}_${settings_manager.audioQualitySetting.value}_url';
+        'song_${songId}_${settings_manager.audioQualitySetting.value}_url$platformSuffix';
 
     // Try to get from cache
     final cachedUrl = await getData(
@@ -956,8 +957,8 @@ Future<String?> getSong(String songId, bool isLive) async {
 AudioStreamInfo selectAudioQuality(List<AudioStreamInfo> availableSources) {
   final qualitySetting = settings_manager.audioQualitySetting.value;
 
-  // For iOS, prioritize MP4 streams
-  if (Platform.isIOS) {
+  // For iOS and macOS, prioritize MP4 streams for better compatibility
+  if (Platform.isIOS || Platform.isMacOS) {
     final mp4Streams = availableSources
         .where((stream) => stream.container == StreamContainer.mp4)
         .toList();

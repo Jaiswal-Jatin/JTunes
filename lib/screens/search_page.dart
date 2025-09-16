@@ -334,7 +334,7 @@ class _SearchPageState extends State<SearchPage> {
     final categories = [
       {'title': 'Top Hits', 'color': Colors.red, 'icon': FluentIcons.trophy_24_filled},
       {'title': 'Bollywood', 'color': Colors.orange, 'icon': FluentIcons.filmstrip_24_filled},
-      {'title': 'Punjabi', 'color': Colors.green, 'icon': FluentIcons.music_note_2_24_filled},
+      {'title': 'Punjabi', 'color': Colors.green, 'icon': Icons.radio},
       {'title': 'K-Pop', 'color': Colors.pink, 'icon': FluentIcons.heart_24_filled},
       {'title': 'Romantic', 'color': Colors.redAccent, 'icon': FluentIcons.heart_pulse_24_filled},
       {'title': 'Party', 'color': Colors.purple, 'icon': FluentIcons.drink_margarita_24_filled},

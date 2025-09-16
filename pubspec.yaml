@@ -30,8 +30,8 @@ dependencies:
   html:
   http:
   intl: 
-  just_audio: ^0.9.38
-  just_audio_background: ^0.0.1-beta.15
+  just_audio: ^0.10.5
+  just_audio_background: ^0.0.1-beta.17
   rxdart: 
   url_launcher: 
   youtube_explode_dart:
