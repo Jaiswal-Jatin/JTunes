@@ -124,7 +124,6 @@ struct MusicWidgetEntryView : View {
     }
 }
 
-@main
 struct MusicWidget: Widget {
     let kind: String = "MusicWidget"
 
@@ -135,6 +134,13 @@ struct MusicWidget: Widget {
         .configurationDisplayName("JTunes Music Player")
         .description("Displays the current playing song and controls.")
         .supportedFamilies([.systemMedium])
+    }
+}
+
+@main
+struct JTunesWidgetBundle: WidgetBundle {
+    var body: some Widget {
+        MusicWidget()
     }
 }
 
