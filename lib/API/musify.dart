@@ -505,7 +505,9 @@ Future<List> getPlaylists({
     if (suggestedPlaylists.isEmpty) {
       suggestedPlaylists = List.from(playlists)..shuffle();
     }
-    return suggestedPlaylists.take(playlistsNum).toList();
+    final playlistsToDisplay = suggestedPlaylists.take(playlistsNum).toList();
+    // Fetch missing images for home screen playlists
+    return _preparePlaylistsForDisplay(playlistsToDisplay);
   }
 
   // If a specific type is requested, filter accordingly.
@@ -519,6 +521,63 @@ Future<List> getPlaylists({
 
   // Default to returning all playlists.
   return playlists;
+}
+
+/// Efficiently fetches and caches thumbnails for a list of playlists.
+///
+/// This is used to populate home screen suggestions where images might be missing.
+Future<List<dynamic>> _preparePlaylistsForDisplay(
+  List<dynamic> playlistsToPrepare,
+) async {
+  final futures = playlistsToPrepare.map((playlist) async {
+    // Log the playlist details to debug image loading issues.
+    logger.log(
+      "Preparing playlist: title='${playlist['title']}', image='${playlist['image']}'",
+      null,
+      null,
+    );
+    // Only fetch if image is missing or empty.
+    if (playlist['image'] == null ||
+        (playlist['image'] is String &&
+            (playlist['image'] as String).isEmpty)) {
+      final playlistTitle = playlist['title'] ?? 'Unknown Playlist';
+      try {
+        final playlistId = playlist['ytid'] as String;
+        logger.log(
+          'Preparing image for playlist: $playlistTitle ($playlistId)',
+          null,
+          null,
+        );
+        final cacheKey = 'playlist_thumb_$playlistId';
+        final cachedImage = await getData('cache', cacheKey);
+        if (cachedImage != null && (cachedImage as String).isNotEmpty) {
+          logger.log('Found cached image for $playlistTitle', null, null);
+          return {...playlist, 'image': cachedImage};
+        }
+
+        logger.log('Fetching new image for $playlistTitle', null, null);
+        final video = await _yt.playlists.getVideos(playlistId).first;
+        final imageUrl = video.thumbnails.highResUrl;
+        await addOrUpdateData('cache', cacheKey, imageUrl);
+        logger.log(
+          'Successfully fetched and cached image for $playlistTitle',
+          null,
+          null,
+        );
+        return {...playlist, 'image': imageUrl};
+      } catch (e) {
+        logger.log(
+          'Failed to fetch image for playlist: $playlistTitle. Error: $e',
+          null,
+          null,
+        );
+        return playlist; // Return original playlist on error
+      }
+    }
+    return playlist;
+  }).toList();
+
+  return Future.wait(futures);
 }
 
 Future<List<String>> getSearchSuggestions(String query) async {
@@ -1011,7 +1070,10 @@ Future<String?> getSongLyrics(String? artist, String title) async {
   return lyrics.value;
 }
 
-Future<bool> makeSongOffline(dynamic song) async {
+Future<bool> makeSongOffline(
+  dynamic song, {
+  Function(double)? onProgress,
+}) async {
   try {
     final String? ytid = song['ytid'];
 
@@ -1019,7 +1081,11 @@ Future<bool> makeSongOffline(dynamic song) async {
       logger.log('makeSongOffline: song["ytid"] is null or empty', null, null);
       return false;
     }
-    if (isSongAlreadyOffline(ytid)) return true;
+    if (isSongAlreadyOffline(ytid)) {
+      // If already offline, report 100% progress immediately
+      onProgress?.call(1.0);
+      return true;
+    }
 
     final audioPath = FilePaths.getAudioPath(ytid);
     final audioFile = File(audioPath);
@@ -1037,9 +1103,19 @@ Future<bool> makeSongOffline(dynamic song) async {
         );
         return false;
       }
+
+      // New download logic with progress
       final stream = _yt.videos.streamsClient.get(audioManifest);
       final fileStream = audioFile.openWrite();
-      await stream.pipe(fileStream);
+      final totalBytes = audioManifest.size.totalBytes;
+      var receivedBytes = 0;
+
+      await for (final chunk in stream) {
+        fileStream.add(chunk);
+        receivedBytes += chunk.length;
+        onProgress?.call((receivedBytes / totalBytes).clamp(0.0, 1.0));
+      }
+
       await fileStream.flush();
       await fileStream.close();
     } catch (e, stackTrace) {

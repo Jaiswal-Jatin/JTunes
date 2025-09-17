@@ -48,6 +48,11 @@ class OfflinePlaylistService {
     Hive.box('userNoBackup').get('offlinePlaylists', defaultValue: []),
   );
 
+  // --- Single Song Download State ---
+  final Map<String, ValueNotifier<double>> songDownloadProgressNotifiers = {};
+  final List<String> activeSongDownloads = [];
+  // --- End of Single Song Download State ---
+
   ValueNotifier<DownloadProgress> getProgressNotifier(String playlistId) {
     if (!downloadProgressNotifiers.containsKey(playlistId)) {
       downloadProgressNotifiers[playlistId] = ValueNotifier<DownloadProgress>(
@@ -55,6 +60,13 @@ class OfflinePlaylistService {
       );
     }
     return downloadProgressNotifiers[playlistId]!;
+  }
+
+  ValueNotifier<double> getSongProgressNotifier(String songId) {
+    if (!songDownloadProgressNotifiers.containsKey(songId)) {
+      songDownloadProgressNotifiers[songId] = ValueNotifier<double>(0.0);
+    }
+    return songDownloadProgressNotifiers[songId]!;
   }
 
   bool isPlaylistDownloaded(String playlistId) {
@@ -65,6 +77,10 @@ class OfflinePlaylistService {
 
   bool isPlaylistDownloading(String playlistId) {
     return activeDownloads.contains(playlistId);
+  }
+
+  bool isSingleSongDownloading(String songId) {
+    return activeSongDownloads.contains(songId);
   }
 
   Future<void> downloadPlaylist(BuildContext context, Map playlist) async {
@@ -144,6 +160,9 @@ class OfflinePlaylistService {
               progressNotifier.value.completed++;
               progressNotifier.notifyListeners();
             } else {
+              // For playlist downloads, we don't need granular progress for each song,
+              // as the overall playlist progress is what matters.
+              // So we call makeSongOffline without the progress callback here.
               final success = await makeSongOffline(song);
               if (success) {
                 progressNotifier.value.completed++;
@@ -236,7 +255,7 @@ class OfflinePlaylistService {
           'title': playlist['title'],
           'image': playlist['image'],
           'source': playlist['source'],
-          'list': songsList.map((s) => s['ytid']).whereType<String>().toList(),
+          'list': songsList,
           'downloadedAt': DateTime.now().millisecondsSinceEpoch,
         };
 
@@ -336,6 +355,61 @@ class OfflinePlaylistService {
     }
   }
 
+  // --- Methods for Single Song Download ---
+
+  Future<void> downloadSingleSong(BuildContext context, Map song) async {
+    final songId = song['ytid'] as String;
+    if (isSingleSongDownloading(songId)) {
+      showToast(context, context.l10n!.alreadyDownloading);
+      return;
+    }
+    if (isSongAlreadyOffline(songId)) {
+      showToast(context, context.l10n!.playlistAlreadyDownloaded);
+      return;
+    }
+
+    activeSongDownloads.add(songId);
+    final progressNotifier = getSongProgressNotifier(songId);
+    progressNotifier.value = 0.0; // Reset progress
+
+    try {
+      // This requires `makeSongOffline` to be updated to accept an `onProgress` callback.
+      final success = await makeSongOffline(
+        song,
+        onProgress: (progress) {
+          if (activeSongDownloads.contains(songId)) {
+            progressNotifier.value = progress;
+          }
+        },
+      );
+
+      if (success) {
+        showToast(context, context.l10n!.playlistDownloaded.split(':')[0]);
+      } else if (activeSongDownloads.contains(songId)) {
+        // Only show failed if not cancelled
+        showToast(context, context.l10n!.downloadFailed.split(':')[0]);
+      }
+    } catch (e, s) {
+      logger.log('Error downloading song $songId', e, s);
+      showToast(context, '${context.l10n!.error}: $e');
+    } finally {
+      activeSongDownloads.remove(songId);
+      // The UI will update because isSingleSongDownloading will become false
+      // and isSongAlreadyOffline will become true (on success).
+      cleanupSongProgressNotifier(songId);
+    }
+  }
+
+  void cancelSingleSongDownload(String songId) {
+    if (isSingleSongDownloading(songId)) {
+      activeSongDownloads.remove(songId);
+      cleanupSongProgressNotifier(songId);
+      // Note: This doesn't cancel the network request itself.
+      // For that, `makeSongOffline` would need to support a CancellationToken.
+      // For now, this will just stop UI updates.
+    }
+  }
+
   void cleanupProgressNotifier(String playlistId) {
     try {
       if (downloadProgressNotifiers.containsKey(playlistId)) {
@@ -344,6 +418,17 @@ class OfflinePlaylistService {
       }
     } catch (e, stackTrace) {
       logger.log('Error cleaning up progress notifier', e, stackTrace);
+    }
+  }
+
+  void cleanupSongProgressNotifier(String songId) {
+    try {
+      if (songDownloadProgressNotifiers.containsKey(songId)) {
+        songDownloadProgressNotifiers[songId]?.dispose();
+        songDownloadProgressNotifiers.remove(songId);
+      }
+    } catch (e, stackTrace) {
+      logger.log('Error cleaning up song progress notifier', e, stackTrace);
     }
   }
 

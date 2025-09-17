@@ -223,38 +223,136 @@ class _HomePageState extends State<HomePage>
         'title': 'Playlist 5',
         'list': <Map<String, dynamic>>[],
       },
+       {
+        'ytid':
+            'https://www.youtube.com/playlist?list=RDCLAK5uy_nlKphX00YtBNjlGZcmPifGNAPXUSjezNM&playnext=1&index=1',
+        'title': 'Playlist 6',
+        'list': <Map<String, dynamic>>[],
+      },
+       {
+        'ytid':
+            'https://www.youtube.com/playlist?list=RDCLAK5uy_lBa7h-v-su4TAsDNvyelrswt9YYYU7x4g&playnext=1&index=1',
+        'title': 'Playlist 7',
+        'list': <Map<String, dynamic>>[],
+      },
+       {
+        'ytid':
+            'https://www.youtube.com/playlist?list=RDCLAK5uy_kb7EBi6y3GrtJri4_ZH56Ms786DFEimbM&playnext=1&index=1',
+        'title': 'Playlist 8',
+        'list': <Map<String, dynamic>>[],
+      },
+       {
+        'ytid':
+            'https://www.youtube.com/playlist?list=RDCLAK5uy_n41V9iqmjro6caBDuDD1E4eWs5yTb5_OY&playnext=1&index=1',
+        'title': 'Playlist 9',
+        'list': <Map<String, dynamic>>[],
+      },
+       {
+        'ytid':
+            'https://www.youtube.com/watch?v=ziM_K-n6svk&list=OLAK5uy_lSTp1DIuzZBUyee3kDsXwPgP25WdfwB40',
+        'title': 'Playlist 10',
+        'list': <Map<String, dynamic>>[],
+      },
+       {
+        'ytid':
+            'https://www.youtube.com/watch?v=yebNIHKAC4A&list=PL4fGSI1pDJn6puJdseH2Rt9sMvt9E2M4i',
+        'title': 'Playlist 11',
+        'list': <Map<String, dynamic>>[],
+      },
+       {
+        'ytid':
+            'https://www.youtube.com/playlist?list=RDCLAK5uy_nLOvZAnN86K4f-fJ6tUi0xHUPBHLBBkVE&playnext=1&index=1',
+        'title': 'Playlist 12',
+        'list': <Map<String, dynamic>>[],
+      },
+       {
+        'ytid':
+            'https://www.youtube.com/playlist?list=RDCLAK5uy_kWKAcJROkxDk9mOVmfDSv9cycK_-Ci2yA&playnext=1&index=1',
+        'title': 'Playlist 13',
+        'list': <Map<String, dynamic>>[],
+      },
+       {
+        'ytid':
+            'https://www.youtube.com/playlist?list=RDCLAK5uy_kiDNaS5nAXxdzsqFElFKKKs0GUEFJE26w&playnext=1&index=1',
+        'title': 'Playlist 14',
+        'list': <Map<String, dynamic>>[],
+      },
+        {
+        'ytid':
+            'https://www.youtube.com/watch?v=983bBbJx0Mk&list=PL4fGSI1pDJn5kI81J1fYWK5eZRl1zJ5kM',
+        'title': 'Playlist 15',
+        'list': <Map<String, dynamic>>[],
+      },
     ];
 
-    _suggestedPlaylistsFuture = Future.wait(userPlaylists.map((playlist) async {
-      final yt = YoutubeService();
-      List<Map<String, dynamic>> songMaps = [];
-      String realTitle = (playlist['title'] ?? '').toString();
+    _suggestedPlaylistsFuture =
+        Future.wait(userPlaylists.map((playlistMap) async {
+      final yt = YoutubeExplode();
+      final playlistUrl = playlistMap['ytid'] as String;
+
+      PlaylistId playlistId;
       try {
-        songMaps =
-            await yt.fetchPlaylistWithFallback(playlist['ytid'] as String);
-        // Try to get the playlist title from the first song's 'playlistTitle' or 'playlist' field
-        if (songMaps.isNotEmpty) {
-          final firstSong = songMaps[0];
-          if (firstSong['playlistTitle'] != null &&
-              firstSong['playlistTitle'].toString().isNotEmpty) {
-            realTitle = firstSong['playlistTitle'].toString();
-          } else if (firstSong['playlist'] != null &&
-              firstSong['playlist'].toString().isNotEmpty) {
-            realTitle = firstSong['playlist'].toString();
-          } else if (firstSong['album'] != null &&
-              firstSong['album'].toString().isNotEmpty) {
-            realTitle = firstSong['album'].toString();
-          }
+        String? idString;
+        // Handle both full URLs (e.g., ...?list=ID) and plain IDs.
+        if (playlistUrl.startsWith('http')) {
+          idString = Uri.parse(playlistUrl).queryParameters['list'];
+        } else {
+          idString = playlistUrl;
         }
+
+        if (idString == null || idString.isEmpty) {
+          throw ArgumentError('Could not extract playlist ID from URL.');
+        }
+        playlistId = PlaylistId(idString);
       } catch (e) {
-        print('Error fetching playlist ${playlist['ytid']}: $e');
+        print('Error parsing playlist URL "$playlistUrl": $e');
+        return {
+          'ytid': playlistUrl,
+          'title': 'Invalid Playlist',
+          'image': null,
+          'list': <Map<String, dynamic>>[],
+        };
       }
-      return {
-        'ytid': playlist['ytid'],
-        'title': realTitle,
-        'list': songMaps,
-      };
-    })).then((list) => list);
+
+      try {
+        // Fetch playlist metadata and the first video concurrently for efficiency.
+        final metadataFuture = yt.playlists.get(playlistId);
+        final videosFuture = yt.playlists.getVideos(playlistId).take(10).toList(); // Fetch first 10
+
+        final results = await Future.wait([metadataFuture, videosFuture]);
+
+        final metadata = results[0] as Playlist;
+        final videos = results[1] as List<Video>;
+
+        if (videos.isEmpty) {
+          // Handle case where playlist is empty
+          return {
+            'ytid': playlistId.value,
+            'title': metadata.title,
+            'image': null, // No image if no videos
+            'list': <Map<String, dynamic>>[],
+          };
+        }
+
+        // Pick a random video from the fetched batch.
+        final randomVideo = videos[Random().nextInt(videos.length)];
+
+        return {
+          'ytid': playlistId.value,
+          'title': metadata.title,
+          'image': randomVideo.thumbnails.highResUrl,
+          'list': <Map<String, dynamic>>[], // Keep song list empty for now.
+        };
+      } catch (e) {
+        print('Error fetching playlist info for $playlistUrl: $e');
+        return {
+          'ytid': playlistUrl,
+          'title': 'Failed to Load',
+          'image': null,
+          'list': <Map<String, dynamic>>[],
+        };
+      }
+    }));
 
     // Initialize other futures with reduced delays for better UX
     _initializeOtherFutures();

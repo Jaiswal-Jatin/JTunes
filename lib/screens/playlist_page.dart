@@ -137,9 +137,14 @@ class _PlaylistPageState extends State<PlaylistPage> {
     try {
       if (widget.playlistData != null) {
         // Playlist data passed from library or search
-        _playlist = Map<String, dynamic>.from(widget.playlistData);
+        // Ensure the map is correctly typed as Map<String, dynamic>
+        _playlist = Map<String, dynamic>.from(
+          Map.from(widget.playlistData).map(
+            (key, value) => MapEntry(key.toString(), value),
+          ),
+        );
 
-        // If this is an offline playlist, the 'list' contains only song IDs.
+        // If this is an offline playlist, the 'list' might contain only song IDs (old format).
         // We need to fetch the full song data from the main offline songs list.
         if (_playlist['downloadedAt'] != null &&
             _playlist['list'] != null &&
@@ -147,8 +152,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
             (_playlist['list'] as List).isNotEmpty &&
             (_playlist['list'] as List).first is String) {
           final songIds = List<String>.from(_playlist['list']);
-          final offlineSongs =
-              List<Map<String, dynamic>>.from(userOfflineSongs);
+          final offlineSongs = (userOfflineSongs as List)
+              .map((s) => Map<String, dynamic>.from(s as Map))
+              .toList();
           final offlineSongsMap = {
             for (var song in offlineSongs) song['ytid'] as String: song
           };
@@ -158,6 +164,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
               .toList();
           _playlist['list'] = playlistSongs;
         }
+
         // Ensure the playlist has a proper list
         if (_playlist['list'] == null || (_playlist['list'] as List).isEmpty) {
           // Try to load songs if playlist doesn't have them
@@ -806,7 +813,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
       onPlay: () {
         audioHandler.playPlaylistSong(playlist: _playlist, songIndex: index);
       },
-      isSongOffline: playlistOfflineStatus,
+      isSongOffline: playlistOfflineStatus || isSongAlreadyOffline(song['ytid']),
       borderRadius: borderRadius,
     );
   }
