@@ -29,8 +29,8 @@ dependencies:
   hive_flutter: 
   html:
   http:
-  intl: 
-  just_audio: ^0.10.5
+  intl:
+  just_audio: ^0.9.36
   just_audio_background: ^0.0.1-beta.17
   rxdart: 
   url_launcher: 

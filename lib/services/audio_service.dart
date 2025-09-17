@@ -216,6 +216,12 @@ class J3TunesAudioHandler extends BaseAudioHandler {
   void _updateCurrentMediaItemWithDuration(Duration duration) {
     try {
       final currentSong = _queueList[_currentQueueIndex];
+      // The duration from the stream can be incorrect for some YouTube tracks (e.g., double).
+      // Prioritize the duration from the metadata if it exists to avoid overwriting it.
+      if (currentSong['duration'] != null) {
+        return;
+      }
+
       final currentMediaItem = mapToMediaItem(currentSong);
       mediaItem.add(currentMediaItem.copyWith(duration: duration));
 
@@ -895,8 +901,9 @@ class J3TunesAudioHandler extends BaseAudioHandler {
           .setAudioSource(audioSource)
           .timeout(_songTransitionTimeout);
       await Future.delayed(const Duration(milliseconds: 100));
-
-      if (audioPlayer.duration != null) {
+      
+      // Only update duration from the player if the song metadata doesn't have it.
+      if (song['duration'] == null && audioPlayer.duration != null) {
         final currentMediaItem = mapToMediaItem(song);
         mediaItem.add(
           currentMediaItem.copyWith(duration: audioPlayer.duration),
