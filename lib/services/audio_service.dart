@@ -36,6 +36,8 @@ import 'package:j3tunes/services/data_manager.dart' hide addOrUpdateData, getDat
 import 'package:j3tunes/services/settings_manager.dart';
 import 'package:j3tunes/services/music_service.dart';
 import 'package:j3tunes/utilities/mediaitem.dart';
+import 'package:home_widget/home_widget.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:rxdart/rxdart.dart';
 
 class J3TunesAudioHandler extends BaseAudioHandler {
@@ -165,6 +167,12 @@ class J3TunesAudioHandler extends BaseAudioHandler {
       _updatePlaybackState();
     });
 
+    // Listen for media item and playback state changes to update the widget
+    mediaItem.distinct().listen((_) => _updateHomeWidget());
+    playbackState
+        .distinct((prev, next) => prev.playing == next.playing)
+        .listen((_) => _updateHomeWidget());
+
     // Listen for player errors
     audioPlayer.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.idle &&
@@ -173,6 +181,36 @@ class J3TunesAudioHandler extends BaseAudioHandler {
         _handlePlaybackError();
       }
     });
+  }
+
+  Future<void> _updateHomeWidget() async {
+    try {
+      final currentMedia = mediaItem.value;
+      final isPlaying = playbackState.value.playing;
+      String? artworkPath;
+
+      if (currentMedia?.artUri != null) {
+        if (currentMedia!.artUri!.scheme == 'file') {
+          artworkPath = currentMedia.artUri!.toFilePath();
+        } else {
+          try {
+            final file = await DefaultCacheManager()
+                .getSingleFile(currentMedia.artUri.toString());
+            artworkPath = file.path;
+          } catch (e) {
+            artworkPath = null;
+          }
+        }
+      }
+
+      await HomeWidget.saveWidgetData<String>('title', currentMedia?.title ?? 'No Song Playing');
+      await HomeWidget.saveWidgetData<String>('artist', currentMedia?.artist ?? 'JTunes');
+      await HomeWidget.saveWidgetData<String>('artwork_path', artworkPath);
+      await HomeWidget.saveWidgetData<bool>('is_playing', isPlaying);
+      await HomeWidget.updateWidget(name: 'MusicWidgetProvider', iOSName: 'MusicWidgetProvider');
+    } catch (e, stackTrace) {
+      logger.log('Error updating home widget', e, stackTrace);
+    }
   }
 
   void _updateCurrentMediaItemWithDuration(Duration duration) {
