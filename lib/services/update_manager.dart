@@ -11,8 +11,6 @@ import 'package:j3tunes/services/router_service.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart'; 
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:open_file_plus/open_file_plus.dart'; // Added for APK installation
-
 const String backendUrl = 'https://jtunes-backend.onrender.com/latest-version'; 
 
 Future<bool> checkAppUpdates({bool showNoUpdateMessage = false}) async {
@@ -99,71 +97,6 @@ class UpdateDialog extends StatefulWidget {
 }
 
 class _UpdateDialogState extends State<UpdateDialog> {
-  bool _isDownloading = false;
-  double _progress = 0.0;
-  String _status = '';
-  String? _downloadedFilePath; // To store the path of the downloaded APK
-
-  Future<void> _downloadApk() async {
-    setState(() {
-      _isDownloading = true;
-      _status = 'Starting download...';
-      _progress = 0.0;
-    });
-
-    try {
-      final dio = Dio();
-      final dir = await getExternalStorageDirectory();
-      final savePath = '${dir?.path}/J3Tunes-v${widget.version}.apk';
-
-      await dio.download(
-        widget.apkUrl,
-        savePath,
-        onReceiveProgress: (received, total) {
-          if (total != -1) {
-            setState(() {
-              _progress = received / total;
-              _status =
-                  'Downloading... ${(received / 1024 / 1024).toStringAsFixed(1)}MB / ${(total / 1024 / 1024).toStringAsFixed(1)}MB';
-            });
-          }
-        },
-      );
-
-      setState(() {
-        _isDownloading = false;
-        _downloadedFilePath = savePath;
-        _status = 'Download complete. Click Install to update.';
-      });
-    } catch (e, s) {
-      logger.log('Update Download Error', e, s);
-      setState(() {
-        _isDownloading = false;
-        _status = 'Download failed. Please try again.';
-        _downloadedFilePath = null;
-      });
-    }
-  }
-
-  Future<void> _installApk() async {
-    if (_downloadedFilePath != null) {
-      setState(() {
-        _status = 'Opening installer...';
-      });
-      try {
-        final result = await OpenFile.open(_downloadedFilePath);
-        if (result.type != ResultType.done) {
-          throw Exception('Failed to open file: ${result.message}');
-        }
-      } catch (e, s) {
-        logger.log('APK Installation Error', e, s);
-        setState(() {
-          _status = 'Failed to open installer. Please try again.';
-        });
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -198,33 +131,21 @@ class _UpdateDialogState extends State<UpdateDialog> {
             ),
           ],
           const SizedBox(height: 20),
-          if (_isDownloading || _downloadedFilePath != null) ...[
-            LinearProgressIndicator(value: _progress),
-            const SizedBox(height: 8),
-            Text(_status, style: Theme.of(context).textTheme.bodySmall),
-          ],
         ],
       ),
       actionsAlignment: MainAxisAlignment.center,
       actions: [
-        if (_downloadedFilePath == null) // Show Download button if not downloaded
-          FilledButton.icon(
-            onPressed: _isDownloading ? null : _downloadApk,
-            icon: _isDownloading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.download),
-            label: Text(context.l10n!.download.toUpperCase()),
-          )
-        else // Show Install button if downloaded
-          FilledButton.icon(
-            onPressed: _installApk,
-            icon: const Icon(Icons.install_desktop),
-            label: Text(context.l10n!.update.toUpperCase()),
-          ),
+        FilledButton.icon(
+          onPressed: () async {
+            if (await canLaunchUrl(Uri.parse(widget.apkUrl))) {
+              await launchUrl(Uri.parse(widget.apkUrl), mode: LaunchMode.externalApplication);
+            } else {
+              showToast(context, context.l10n!.error);
+            }
+          },
+          icon: const Icon(Icons.download),
+          label: Text(context.l10n!.download.toUpperCase()),
+        ),
       ],
     );
   }

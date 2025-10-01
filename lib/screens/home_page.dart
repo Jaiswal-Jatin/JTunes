@@ -172,7 +172,7 @@ class _HomePageState extends State<HomePage>
     if (!isFdroidBuild && !_updateCheckPerformed) {
       SchedulerBinding.instance.addPostFrameCallback((_) async {
         if (mounted) { // Ensure the widget is still mounted before showing dialogs
-          await checkAppUpdates();
+          await checkAppUpdates(); // Pass context
           _updateCheckPerformed = true;
         }
       });

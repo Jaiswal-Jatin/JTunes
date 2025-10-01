@@ -155,32 +155,32 @@ class _SettingsPageState extends State<SettingsPage> {
               onChanged: (value) => _togglePureBlack(context, value),
             ),
           ),
-        ValueListenableBuilder<bool>(
-          valueListenable: predictiveBack,
-          builder: (_, value, __) {
-            return CustomBar(
-              context.l10n!.predictiveBack,
-              FluentIcons.position_backward_24_filled,
-              trailing: Switch(
-                value: value,
-                onChanged: (value) => _togglePredictiveBack(context, value),
-              ),
-            );
-          },
-        ),
-        ValueListenableBuilder<bool>(
-          valueListenable: offlineMode,
-          builder: (_, value, __) {
-            return CustomBar(
-              context.l10n!.offlineMode,
-              FluentIcons.cellular_off_24_regular,
-              trailing: Switch(
-                value: value,
-                onChanged: (value) => _toggleOfflineMode(context, value),
-              ),
-            );
-          },
-        ),
+        // ValueListenableBuilder<bool>(
+        //   valueListenable: predictiveBack,
+        //   builder: (_, value, __) {
+        //     return CustomBar(
+        //       context.l10n!.predictiveBack,
+        //       FluentIcons.position_backward_24_filled,
+        //       trailing: Switch(
+        //         value: value,
+        //         onChanged: (value) => _togglePredictiveBack(context, value),
+        //       ),
+        //     );
+        //   },
+        // ),
+        // ValueListenableBuilder<bool>(
+        //   valueListenable: offlineMode,
+        //   builder: (_, value, __) {
+        //     return CustomBar(
+        //       context.l10n!.offlineMode,
+        //       FluentIcons.cellular_off_24_regular,
+        //       trailing: Switch(
+        //         value: value,
+        //         onChanged: (value) => _toggleOfflineMode(context, value),
+        //       ),
+        //     );
+        //   },
+        // ),
         ValueListenableBuilder<bool>(
           valueListenable: backgroundPlay,
           builder: (_, value, __) {
@@ -289,7 +289,7 @@ class _SettingsPageState extends State<SettingsPage> {
             context.l10n!.downloadAppUpdate,
             FluentIcons.arrow_download_24_filled,
             borderRadius: commonCustomBarRadiusLast,
-            onTap: () => checkAppUpdates(showNoUpdateMessage: true),
+            onTap: () => checkAppUpdates( showNoUpdateMessage: true),
           ),
       ],
     );
@@ -316,12 +316,12 @@ class _SettingsPageState extends State<SettingsPage> {
     return Column(
       children: [
         SectionHeader(title: context.l10n!.others),
-        // CustomBar(
-        //   context.l10n!.licenses,
-        //   FluentIcons.document_24_filled,
-        //   borderRadius: commonCustomBarRadiusFirst,
-        //   onTap: () => NavigationManager.router.go('/settings/license'),
-        // ),
+        CustomBar(
+          context.l10n!.licenses,
+          FluentIcons.document_24_filled,
+          borderRadius: commonCustomBarRadiusFirst,
+          onTap: () => NavigationManager.router.go('/settings/license'),
+        ),
         // CustomBar(
         //   '${context.l10n!.copyLogs} (${logger.getLogCount()})',
         //   FluentIcons.error_circle_24_filled,
@@ -330,7 +330,7 @@ class _SettingsPageState extends State<SettingsPage> {
         CustomBar(
           context.l10n!.about,
           FluentIcons.book_information_24_filled,
-          borderRadius: commonCustomBarRadius,
+          borderRadius: commonCustomBarRadiusLast,
           onTap: () => NavigationManager.router.go('/settings/about'),
         ),
       ],

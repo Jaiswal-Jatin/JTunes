@@ -217,8 +217,8 @@ class NavigationManager {
               GoRoute(
                 path: 'license',
                 builder: (context, state) => const LicensePage(
-                  applicationName: 'J3Tunes',
-                  applicationVersion: appVersion,
+                  applicationName: 'JTunes',
+                  // applicationVersion: appVersion,
                 ),
               ),
               GoRoute(
@@ -275,8 +275,8 @@ class NavigationManager {
               GoRoute(
                 path: 'license',
                 builder: (context, state) => const LicensePage(
-                  applicationName: 'J3Tunes',
-                  applicationVersion: appVersion,
+                  applicationName: 'JTunes',
+                  // applicationVersion: appVersion,
                 ),
               ),
               GoRoute(

@@ -44,6 +44,7 @@ class _AboutPageState extends State<AboutPage> {
             _buildDeveloperInfoSection(context),
             const SizedBox(height: 20),
             _buildExtraFeaturesSection(context),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -76,7 +77,7 @@ class _AboutPageState extends State<AboutPage> {
 
   void _sharePlayStoreLink() {
     Share.share(
-      'Check out J3Tunes, a cool music app! Download it here: https://play.google.com/store/apps/details?id=com.jatin.J3Tunes',
+      'Check out J3Tunes, a cool music app! Download it here: https://github.com/Jaiswal-Jatin/JTunes/releases/download/JTunes/JTunes.apk',
       subject: 'J3Tunes Music App',
     );
   }
@@ -219,6 +220,7 @@ class _AboutPageState extends State<AboutPage> {
                 title: const Text('Send Feedback'),
                 onTap: _sendFeedback,
               ),
+              
             ],
           ),
         ),

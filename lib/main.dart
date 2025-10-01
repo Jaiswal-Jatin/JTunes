@@ -256,7 +256,8 @@ void main() async {
   
   // Initialize Hive and other services first
   await initialisation();
-  // Removed direct call to checkAppUpdates() from here. It's now in J3TunesState.initState.
+  // Check for app updates after initialization (now handled by HomePage)
+  // await checkAppUpdates(); // Removed as per plan
 
   // Add these error handlers before runApp
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -341,6 +342,7 @@ Future<void> initialisation() async {
   // Get app version dynamically
   final packageInfo = await PackageInfo.fromPlatform();
   currentAppVersion = packageInfo.version;
+  logger.log('Current App Version: $currentAppVersion', null, null); // Added log
 
   applicationDirPath = (await getApplicationDocumentsDirectory()).path;
   await FilePaths.ensureDirectoriesExist();
