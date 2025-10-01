@@ -11,6 +11,7 @@ import 'package:j3tunes/services/router_service.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart'; 
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:open_file_plus/open_file_plus.dart'; // Added for APK installation
 
 const String backendUrl = 'https://jtunes-backend.onrender.com/latest-version'; 
 
@@ -101,11 +102,13 @@ class _UpdateDialogState extends State<UpdateDialog> {
   bool _isDownloading = false;
   double _progress = 0.0;
   String _status = '';
+  String? _downloadedFilePath; // To store the path of the downloaded APK
 
-  Future<void> _downloadAndInstall() async {
+  Future<void> _downloadApk() async {
     setState(() {
       _isDownloading = true;
       _status = 'Starting download...';
+      _progress = 0.0;
     });
 
     try {
@@ -128,34 +131,58 @@ class _UpdateDialogState extends State<UpdateDialog> {
       );
 
       setState(() {
-        _status = 'Download complete. Opening installer...';
+        _isDownloading = false;
+        _downloadedFilePath = savePath;
+        _status = 'Download complete. Click Install to update.';
       });
-
-      // Use url_launcher to open the downloaded APK
-      final fileUri = Uri.file(savePath);
-      if (await canLaunchUrl(fileUri)) {
-        await launchUrl(fileUri);
-      } else {
-        throw Exception('Could not launch $fileUri');
-      }
     } catch (e, s) {
       logger.log('Update Download Error', e, s);
       setState(() {
         _isDownloading = false;
         _status = 'Download failed. Please try again.';
+        _downloadedFilePath = null;
       });
+    }
+  }
+
+  Future<void> _installApk() async {
+    if (_downloadedFilePath != null) {
+      setState(() {
+        _status = 'Opening installer...';
+      });
+      try {
+        final result = await OpenFile.open(_downloadedFilePath);
+        if (result.type != ResultType.done) {
+          throw Exception('Failed to open file: ${result.message}');
+        }
+      } catch (e, s) {
+        logger.log('APK Installation Error', e, s);
+        setState(() {
+          _status = 'Failed to open installer. Please try again.';
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Update Available'),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Column(
+        children: [
+          Icon(Icons.system_update_alt, size: 48, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(height: 10),
+          const Text('Update Available', textAlign: TextAlign.center),
+        ],
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('A new version (v${widget.version}) is available.'),
+          Text(
+            'A new version (v${widget.version}) is available.',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           if (widget.notes != null && widget.notes!.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(
@@ -163,26 +190,40 @@ class _UpdateDialogState extends State<UpdateDialog> {
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Text(widget.notes!),
+            ConstrainedBox( // Use ConstrainedBox to limit the height of update notes
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.2), // Limit to 20% of screen height
+              child: SingleChildScrollView(
+                child: Text(widget.notes!),
+              ),
+            ),
           ],
-          if (_isDownloading) ...[
-            const SizedBox(height: 20),
+          const SizedBox(height: 20),
+          if (_isDownloading || _downloadedFilePath != null) ...[
             LinearProgressIndicator(value: _progress),
             const SizedBox(height: 8),
             Text(_status, style: Theme.of(context).textTheme.bodySmall),
           ],
         ],
       ),
+      actionsAlignment: MainAxisAlignment.center,
       actions: [
-        if (!widget.isForced && !_isDownloading)
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(context.l10n!.cancel.toUpperCase()),
-          ),
-        if (!_isDownloading)
-          FilledButton(
-            onPressed: _downloadAndInstall,
-            child: Text(context.l10n!.download.toUpperCase()),
+        if (_downloadedFilePath == null) // Show Download button if not downloaded
+          FilledButton.icon(
+            onPressed: _isDownloading ? null : _downloadApk,
+            icon: _isDownloading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.download),
+            label: Text(context.l10n!.download.toUpperCase()),
+          )
+        else // Show Install button if downloaded
+          FilledButton.icon(
+            onPressed: _installApk,
+            icon: const Icon(Icons.install_desktop),
+            label: Text(context.l10n!.update.toUpperCase()),
           ),
       ],
     );

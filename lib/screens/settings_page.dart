@@ -155,32 +155,32 @@ class _SettingsPageState extends State<SettingsPage> {
               onChanged: (value) => _togglePureBlack(context, value),
             ),
           ),
-        // ValueListenableBuilder<bool>(
-        //   valueListenable: predictiveBack,
-        //   builder: (_, value, __) {
-        //     return CustomBar(
-        //       context.l10n!.predictiveBack,
-        //       FluentIcons.position_backward_24_filled,
-        //       trailing: Switch(
-        //         value: value,
-        //         onChanged: (value) => _togglePredictiveBack(context, value),
-        //       ),
-        //     );
-        //   },
-        // ),
-        // ValueListenableBuilder<bool>(
-        //   valueListenable: offlineMode,
-        //   builder: (_, value, __) {
-        //     return CustomBar(
-        //       context.l10n!.offlineMode,
-        //       FluentIcons.cellular_off_24_regular,
-        //       trailing: Switch(
-        //         value: value,
-        //         onChanged: (value) => _toggleOfflineMode(context, value),
-        //       ),
-        //     );
-        //   },
-        // ),
+        ValueListenableBuilder<bool>(
+          valueListenable: predictiveBack,
+          builder: (_, value, __) {
+            return CustomBar(
+              context.l10n!.predictiveBack,
+              FluentIcons.position_backward_24_filled,
+              trailing: Switch(
+                value: value,
+                onChanged: (value) => _togglePredictiveBack(context, value),
+              ),
+            );
+          },
+        ),
+        ValueListenableBuilder<bool>(
+          valueListenable: offlineMode,
+          builder: (_, value, __) {
+            return CustomBar(
+              context.l10n!.offlineMode,
+              FluentIcons.cellular_off_24_regular,
+              trailing: Switch(
+                value: value,
+                onChanged: (value) => _toggleOfflineMode(context, value),
+              ),
+            );
+          },
+        ),
         ValueListenableBuilder<bool>(
           valueListenable: backgroundPlay,
           builder: (_, value, __) {

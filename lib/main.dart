@@ -164,18 +164,7 @@ class _J3TunesState extends State<J3Tunes> with WidgetsBindingObserver {
       logger.log('License Registration Error', e, stackTrace);
     }
 
-    // Re-adding the update check here, but without kReleaseMode and offlineMode.value conditions
-    if (!isFdroidBuild && !isUpdateChecked) {
-      SchedulerBinding.instance.addPostFrameCallback((_) async {
-        // Ensure NavigationManager().context is set before calling checkAppUpdates
-        // This is a workaround if NavigationManager().context is not reliably set earlier.
-        // A more robust solution might involve passing context directly to checkAppUpdates.
-        if (NavigationManager().context.mounted) { // Check if context is mounted
-          await checkAppUpdates();
-          isUpdateChecked = true;
-        }
-      });
-    }
+    // Removed update check from here. It will now be handled by the HomePage.
   }
 
   @override
