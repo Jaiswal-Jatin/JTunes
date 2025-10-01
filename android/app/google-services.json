@@ -12,7 +12,20 @@
           "package_name": "com.jatin.J3Tunes"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "929077861289-tpfoutpbimaev4nampj056rsbthdpbqj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.jatin.J3Tunes",
+            "certificate_hash": "ad9d2b7f44b3454dd2ec20b616948a626964fd05"
+          }
+        },
+        {
+          "client_id": "929077861289-j8hpcbgv5t4q4lavn3icod8mts5pfmfi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCSvydSUh9A-l5ROZTqp5xB104NtGUdi38"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "929077861289-j8hpcbgv5t4q4lavn3icod8mts5pfmfi.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "929077861289-cjuvonggpfvurjjr1thtl5mghb5qplag.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.jatin.j3tunes"
+              }
+            }
+          ]
         }
       }
     }
