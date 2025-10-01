@@ -57,6 +57,10 @@ dependencies:
   cloud_firestore: ^4.17.4
   google_sign_in: ^6.2.1
   font_awesome_flutter: 
+  package_info_plus: 
+  share_plus:
+  device_apps_plus: 
+  
   
  
 
@@ -67,7 +71,7 @@ dev_dependencies:
   flutter_launcher_icons: ^0.13.1
 
 dependency_overrides:
-  collection: ^1.18.0
+  collection: ^1.19.0
 
 flutter:
   generate: true
