@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "929077861289",
+    "project_id": "jtunes-2eee8",
+    "storage_bucket": "jtunes-2eee8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:929077861289:android:963015ff3b42fc0c0682b8",
+        "android_client_info": {
+          "package_name": "com.jatin.J3Tunes"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCSvydSUh9A-l5ROZTqp5xB104NtGUdi38"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

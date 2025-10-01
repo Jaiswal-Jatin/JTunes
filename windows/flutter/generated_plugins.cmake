@@ -6,6 +6,8 @@ list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   dynamic_color
   file_selector_windows
+  firebase_auth
+  firebase_core
   flutter_inappwebview_windows
   screen_retriever
   url_launcher_windows
