@@ -21,10 +21,15 @@
  *     please visit: https://github.com/gokadzev/J3Tunes
  */
 
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:j3tunes/API/version.dart';
+import 'package:j3tunes/screens/auth/login_page.dart';
+import 'package:j3tunes/screens/auth/signup_page.dart';
 import 'package:j3tunes/screens/about_page.dart';
 import 'package:j3tunes/screens/adaptive_layout.dart';
 import 'package:j3tunes/screens/mobile_ui/bottom_navigation_page.dart';
@@ -32,6 +37,7 @@ import 'package:j3tunes/screens/home_page.dart';
 import 'package:j3tunes/screens/library_page.dart';
 import 'package:j3tunes/screens/search_page.dart';
 import 'package:j3tunes/screens/settings_page.dart';
+import 'package:j3tunes/screens/user_profile_page.dart';
 import 'package:j3tunes/screens/user_songs_page.dart';
 import 'package:j3tunes/screens/splash_screen.dart';
 import 'package:j3tunes/screens/desktop_ui/desktop_scaffold.dart';
@@ -55,7 +61,19 @@ class NavigationManager {
           return getPage(child: const SplashScreen(), state: state);
         },
       ),
-      
+      GoRoute(
+        path: '/login',
+        name: 'login',
+        pageBuilder: (context, state) =>
+            getPage(child: const LoginPage(), state: state),
+      ),
+      GoRoute(
+        path: '/signup',
+        name: 'signup',
+        pageBuilder: (context, state) =>
+            getPage(child: const SignUpPage(), state: state),
+      ),
+
       // Main App Routes
       StatefulShellRoute.indexedStack(
         parentNavigatorKey: parentNavigatorKey,
@@ -73,9 +91,34 @@ class NavigationManager {
 
     router = GoRouter(
       navigatorKey: parentNavigatorKey,
-      initialLocation: '/splash', // Start with splash screen
+      initialLocation: '/splash',
       routes: routes,
       restorationScopeId: 'router',
+      refreshListenable: GoRouterRefreshStream(FirebaseAuth.instance.authStateChanges()),
+      redirect: (BuildContext context, GoRouterState state) {
+        final bool loggedIn = FirebaseAuth.instance.currentUser != null;
+        final bool onAuthScreen =
+            state.matchedLocation == '/login' || state.matchedLocation == '/signup';
+        final bool onSplashScreen = state.matchedLocation == '/splash';
+
+        // Agar splash screen par hai, to use wahi rehne do. Splash screen khud navigation handle karegi.
+        if (onSplashScreen) {
+          return null;
+        }
+
+        // Agar user logged in nahi hai aur auth screen par nahi hai, to login par bhejo.
+        if (!loggedIn && !onAuthScreen) {
+          return '/login';
+        }
+
+        // Agar user logged in hai aur auth screen par hai, to home par bhejo.
+        if (loggedIn && onAuthScreen) {
+          return '/home';
+        }
+
+        // Baaki sab cases mein, koi redirection nahi.
+        return null;
+      },
       debugLogDiagnostics: kDebugMode,
       routerNeglect: true,
     );
@@ -111,6 +154,7 @@ class NavigationManager {
   static const String settingsPath = '/settings';
   static const String searchPath = '/search';
   static const String libraryPath = '/library';
+  static const String profilePath = '/settings/profile';
 
   List<StatefulShellBranch> _onlineRoutes() {
     return [
@@ -181,6 +225,10 @@ class NavigationManager {
                 path: 'about',
                 builder: (context, state) => const AboutPage(),
               ),
+              GoRoute(
+                path: 'profile',
+                builder: (context, state) => const UserProfilePage(),
+              ),
             ],
           ),
         ],
@@ -235,6 +283,10 @@ class NavigationManager {
                 path: 'about',
                 builder: (context, state) => const AboutPage(),
               ),
+              GoRoute(
+                path: 'profile',
+                builder: (context, state) => const UserProfilePage(),
+              ),
             ],
           ),
         ],
@@ -244,5 +296,23 @@ class NavigationManager {
 
   static Page getPage({required Widget child, required GoRouterState state}) {
     return MaterialPage(key: state.pageKey, child: child);
+  }
+}
+
+/// A utility class to convert a [Stream] to a [Listenable] for `GoRouter`.
+class GoRouterRefreshStream extends ChangeNotifier {
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    notifyListeners();
+    _subscription = stream.asBroadcastStream().listen(
+          (dynamic _) => notifyListeners(),
+        );
+  }
+
+  late final StreamSubscription<dynamic> _subscription;
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
   }
 }

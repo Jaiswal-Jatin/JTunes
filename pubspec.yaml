@@ -46,14 +46,18 @@ dependencies:
   home_widget: 
   workmanager: 
   youtube_player_flutter: 
-  shimmer: ^3.0.0
-  lottie: ^3.1.0
-  flutter_cache_manager: ^3.3.1
-  audio_video_progress_bar: ^2.0.1 
-  window_manager: ^0.3.8
-  firebase_core: ^2.10.0
-  firebase_analytics: ^10.4.0
-  firebase_auth: 
+  shimmer: 
+  lottie: 
+  flutter_cache_manager:
+  audio_video_progress_bar: 
+  window_manager: 
+  firebase_core: ^2.32.0
+  firebase_analytics: ^10.10.7
+  firebase_auth: ^4.20.0
+  cloud_firestore: ^4.17.4
+  google_sign_in: ^6.2.1
+  font_awesome_flutter: 
+  
  
 
 dev_dependencies:
@@ -69,10 +73,11 @@ flutter:
   generate: true
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
+ 
   assets:
     - assets/licenses/
     - assets/images/
+    - assets/animations/
 
   fonts:
     - family: paytoneOne
