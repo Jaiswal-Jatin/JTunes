@@ -278,19 +278,19 @@ class _SettingsPageState extends State<SettingsPage> {
         CustomBar(
           context.l10n!.restoreUserData,
           FluentIcons.cloud_add_24_filled,
-           borderRadius: commonCustomBarRadiusLast,
+          //  borderRadius: commonCustomBarRadiusLast,
           onTap: () async {
             final response = await restoreData(context);
             showToast(context, response);
           },
         ),
-        // if (!isFdroidBuild)
-        //   CustomBar(
-        //     context.l10n!.downloadAppUpdate,
-        //     FluentIcons.arrow_download_24_filled,
-        //     borderRadius: commonCustomBarRadiusLast,
-        //     onTap: checkAppUpdates,
-        //   ),
+        if (!isFdroidBuild)
+          CustomBar(
+            context.l10n!.downloadAppUpdate,
+            FluentIcons.arrow_download_24_filled,
+            borderRadius: commonCustomBarRadiusLast,
+            onTap: () => checkAppUpdates(showNoUpdateMessage: true),
+          ),
       ],
     );
   }

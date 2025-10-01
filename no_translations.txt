@@ -1,1 +1,77 @@
-{}
+{
+  "ar": [
+    "appIsUpdated"
+  ],
+
+  "de": [
+    "appIsUpdated"
+  ],
+
+  "el": [
+    "appIsUpdated"
+  ],
+
+  "es": [
+    "appIsUpdated"
+  ],
+
+  "fr": [
+    "appIsUpdated"
+  ],
+
+  "he": [
+    "appIsUpdated"
+  ],
+
+  "hi": [
+    "appIsUpdated"
+  ],
+
+  "id": [
+    "appIsUpdated"
+  ],
+
+  "it": [
+    "appIsUpdated"
+  ],
+
+  "ja": [
+    "appIsUpdated"
+  ],
+
+  "ko": [
+    "appIsUpdated"
+  ],
+
+  "pl": [
+    "appIsUpdated"
+  ],
+
+  "pt": [
+    "appIsUpdated"
+  ],
+
+  "ru": [
+    "appIsUpdated"
+  ],
+
+  "sv": [
+    "appIsUpdated"
+  ],
+
+  "tr": [
+    "appIsUpdated"
+  ],
+
+  "uk": [
+    "appIsUpdated"
+  ],
+
+  "zh": [
+    "appIsUpdated"
+  ],
+
+  "zh_Hant": [
+    "appIsUpdated"
+  ]
+}

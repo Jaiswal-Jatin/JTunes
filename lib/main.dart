@@ -24,7 +24,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:j3tunes/extensions/l10n.dart';
 import 'package:j3tunes/services/audio_service.dart';
 import 'package:j3tunes/services/data_manager.dart' hide addOrUpdateData;
-import 'package:j3tunes/services/io_service.dart';
+import 'package:j3tunes/services/io_service.dart'; // Removed 'hide FilePaths'
 import 'package:j3tunes/services/logger_service.dart';
 import 'package:j3tunes/services/playlist_sharing.dart';
 import 'package:j3tunes/services/router_service.dart';
@@ -39,6 +39,7 @@ import 'package:j3tunes/screens/adaptive_layout.dart';
 import 'package:j3tunes/screens/mobile_ui/bottom_navigation_page.dart';
 import 'package:j3tunes/screens/desktop_ui/desktop_scaffold.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:package_info_plus/package_info_plus.dart'; // Added for dynamic app version
 
 /// Global notifier for the currently selected song (for instant SongBar update)
 final ValueNotifier<Map<String, dynamic>?> currentSongNotifier = ValueNotifier<Map<String, dynamic>?>(null);
@@ -50,6 +51,7 @@ final appLinks = AppLinks();
 
 bool isFdroidBuild = false;
 bool isUpdateChecked = false;
+String? currentAppVersion; // Global variable to store the app version
 
 const appLanguages = <String, String>{
   'English': 'en',
@@ -162,13 +164,16 @@ class _J3TunesState extends State<J3Tunes> with WidgetsBindingObserver {
       logger.log('License Registration Error', e, stackTrace);
     }
 
-    if (!isFdroidBuild &&
-        !isUpdateChecked &&
-        !offlineMode.value &&
-        kReleaseMode) {
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        checkAppUpdates();
-        isUpdateChecked = true;
+    // Re-adding the update check here, but without kReleaseMode and offlineMode.value conditions
+    if (!isFdroidBuild && !isUpdateChecked) {
+      SchedulerBinding.instance.addPostFrameCallback((_) async {
+        // Ensure NavigationManager().context is set before calling checkAppUpdates
+        // This is a workaround if NavigationManager().context is not reliably set earlier.
+        // A more robust solution might involve passing context directly to checkAppUpdates.
+        if (NavigationManager().context.mounted) { // Check if context is mounted
+          await checkAppUpdates();
+          isUpdateChecked = true;
+        }
       });
     }
   }
@@ -196,6 +201,9 @@ class _J3TunesState extends State<J3Tunes> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // NavigationManager().context is set by the GoRouter itself.
+    // No need to explicitly set it here.
+
     return DynamicColorBuilder(
       builder: (lightColorScheme, darkColorScheme) {
         final colorScheme = getAppColorScheme(
@@ -259,6 +267,7 @@ void main() async {
   
   // Initialize Hive and other services first
   await initialisation();
+  // Removed direct call to checkAppUpdates() from here. It's now in J3TunesState.initState.
 
   // Add these error handlers before runApp
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -339,6 +348,10 @@ Future<void> initialisation() async {
   } catch (e, stackTrace) {
     logger.log('Initialization Error', e, stackTrace);
   }
+
+  // Get app version dynamically
+  final packageInfo = await PackageInfo.fromPlatform();
+  currentAppVersion = packageInfo.version;
 
   applicationDirPath = (await getApplicationDocumentsDirectory()).path;
   await FilePaths.ensureDirectoriesExist();
