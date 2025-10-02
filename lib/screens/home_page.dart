@@ -25,6 +25,7 @@ import 'dart:math';
 import 'package:j3tunes/widgets/shimmer_widgets.dart';
 import 'dart:ui';
 
+import 'package:j3tunes/widgets/banner_ad_widget.dart';
 // Helper: filter only real songs (duration <= 5min, not mashup/remix/etc)
 bool isValidSong(Video song) {
   final duration = song.duration?.inSeconds ?? 0;
@@ -578,6 +579,11 @@ class _HomePageState extends State<HomePage>
                         child: _buildRecentlyPlayedSection(),
                       ),
 
+                      // Ad Widget
+                      const RepaintBoundary(
+                        child: BannerAdWidget(),
+                      ),
+
                       // Song sections with reduced spacing
                       ..._buildSongSections(),
 
@@ -588,8 +594,14 @@ class _HomePageState extends State<HomePage>
                         ),
                       ],
 
+                     // Bottom Ad Widget
+                    const RepaintBoundary(
+                        child: BannerAdWidget(),
+                      ),  
+
                       // Bottom padding for mini player
                       const SizedBox(height: 80), // Reduced from 100
+
                     ],
                   ),
           ),

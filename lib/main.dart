@@ -28,6 +28,7 @@ import 'package:j3tunes/services/io_service.dart'; // Removed 'hide FilePaths'
 import 'package:j3tunes/services/logger_service.dart';
 import 'package:j3tunes/services/playlist_sharing.dart';
 import 'package:j3tunes/services/router_service.dart';
+import 'package:j3tunes/services/ad_service.dart';
 import 'package:j3tunes/services/settings_manager.dart';
 import 'package:j3tunes/services/update_manager.dart';
 import 'package:j3tunes/widgets/MusicWidgetProvider.dart';
@@ -39,6 +40,7 @@ import 'package:j3tunes/screens/adaptive_layout.dart';
 import 'package:j3tunes/screens/mobile_ui/bottom_navigation_page.dart';
 import 'package:j3tunes/screens/desktop_ui/desktop_scaffold.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:package_info_plus/package_info_plus.dart'; // Added for dynamic app version
 
 /// Global notifier for the currently selected song (for instant SongBar update)
@@ -251,6 +253,13 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    // Initialize AdMob SDK
+    unawaited(
+      MobileAds.instance.initialize(),
+    );
+    // Initialize our AdService to pre-load ads.
+    AdService.instance.initialize();
+
     // FirebaseAuth.instance.useAuthEmulator('localhost', 9099); // Comment out if not using emulator
   }
   

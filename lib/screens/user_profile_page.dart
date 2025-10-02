@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:j3tunes/models/user_model.dart';
 import 'package:j3tunes/services/auth_service.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
+import 'package:j3tunes/widgets/banner_ad_widget.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 
@@ -350,6 +351,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                 style: TextStyle(fontSize: 16),
                               ),
                       ),
+                    ),
+
+                    const SizedBox(height: 30),
+
+                    const RepaintBoundary(
+                      child: BannerAdWidget(),
                     ),
                   ],
                 ),

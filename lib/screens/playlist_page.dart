@@ -39,6 +39,7 @@ import 'package:j3tunes/services/playlist_download_service.dart';
 import 'package:j3tunes/services/playlist_sharing.dart';
 import 'package:j3tunes/utilities/common_variables.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
+import 'package:j3tunes/widgets/banner_ad_widget.dart';
 import 'package:j3tunes/utilities/playlist_image_picker.dart';
 import 'package:j3tunes/utilities/utils.dart';
 import 'package:j3tunes/widgets/playlist_cube.dart';
@@ -362,19 +363,37 @@ class _PlaylistPageState extends State<PlaylistPage> {
                       child: buildSongActionsRow(),
                     ),
                   ),
+                  // Ad Widget
+                  const SliverToBoxAdapter(
+                    child: RepaintBoundary(
+                      child: BannerAdWidget(),
+                    ),
+                  ),
+
                   SliverPadding(
                     padding: commonListViewBottmomPadding,
                     sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (BuildContext context, int index) {
-                          final isRemovable =
-                              _playlist['source'] == 'user-created';
-                          return _buildSongListItem(index, isRemovable);
-                        },
-                        childCount: _hasMore
-                            ? _songsList.length + 1
-                            : _songsList.length,
-                      ),
+                      delegate: SliverChildBuilderDelegate((BuildContext context, int index) {
+                        const adInterval = 10;
+                        final adIndex = adInterval;
+
+                        // Check if this index should be an ad
+                        if (index > 0 && (index + 1) % (adInterval + 1) == 0) {
+                          return const RepaintBoundary(
+                            child: BannerAdWidget(),
+                          );
+                        }
+
+                        // Adjust index to get the correct song from the list
+                        final songIndex = index - (index ~/ (adInterval + 1));
+
+                        final isRemovable = _playlist['source'] == 'user-created';
+                        return _buildSongListItem(songIndex, isRemovable);
+                      }, childCount: _hasMore
+                          // Calculate total items: songs + ads + spinner
+                          ? _songsList.length + (_songsList.length ~/ 10) + 1
+                          // Calculate total items: songs + ads
+                          : _songsList.length + (_songsList.length ~/ 10)),
                     ),
                   ),
                 ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:j3tunes/API/musify.dart' as musify;
 import 'package:j3tunes/main.dart';
+import 'package:j3tunes/widgets/banner_ad_widget.dart';
 import 'package:j3tunes/screens/playlist_page.dart';
 import 'package:j3tunes/widgets/mini_player.dart';
 import 'package:j3tunes/widgets/playlist_bar.dart';
@@ -94,14 +95,27 @@ class _ArtistPageState extends State<ArtistPage> {
                       SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
-                            // Show top 5 songs initially
-                            if (index >= 5) return null;
-                            return SongBar(songs[index], true);
+                            const adInterval = 10;
+                            if (index > 0 && (index + 1) % (adInterval + 1) == 0) {
+                              return const RepaintBoundary(child: BannerAdWidget());
+                            }
+                            final songIndex = index - (index ~/ (adInterval + 1));
+
+                            // Show top 5 songs initially (now we need to check songIndex)
+                            if (songIndex >= 5) return null;
+                            return SongBar(songs[songIndex], true);
                           },
-                          childCount: songs.length > 5 ? 5 : songs.length,
+                          childCount: (songs.length > 5 ? 5 : songs.length) + ((songs.length > 5 ? 5 : songs.length) ~/ 10),
                         ),
                       ),
                     ],
+                    // Ad Widget
+                    // const SliverToBoxAdapter(
+                    //   child: RepaintBoundary(
+                    //     child: BannerAdWidget(),
+                    //   ),
+                    // ),
+
                     if (playlists.isNotEmpty) ...[
                       SliverToBoxAdapter(
                         child: Padding(

@@ -1,25 +1,6 @@
 // ignore_for_file: directives_ordering
 
-/*
- *     Copyright (C) 2025 Valeri Gokadze
- *
- *     J3Tunes is free software: you can redistribute it and/or modify
- *     it under the terms of the GNU General Public License as published by
- *     the Free Software Foundation, either version 3 of the License, or
- *     (at your option) any later version.
- *
- *     J3Tunes is distributed in the hope that it will be useful,
- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *     GNU General Public License for more details.
- *
- *     You should have received a copy of the GNU General Public License
- *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- *
- *     For more information about J3Tunes, including how to contribute,
- *     please visit: https://github.com/gokadzev/J3Tunes
- */
+
 
 import 'package:j3tunes/API/musify.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
@@ -27,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:j3tunes/extensions/l10n.dart';
 import 'package:j3tunes/main.dart';
 import 'package:j3tunes/services/settings_manager.dart';
+import 'package:j3tunes/widgets/banner_ad_widget.dart';
 import 'package:j3tunes/utilities/utils.dart';
 import 'package:j3tunes/widgets/playlist_cube.dart';
 import 'package:j3tunes/widgets/playlist_header.dart';
@@ -90,6 +72,10 @@ class _UserSongsPageState extends State<UserSongsPage> {
           ),
         ),
         buildSongList(title, songsList, length),
+        // Padding for mini player
+        const SliverToBoxAdapter(
+          child: SizedBox(height: 80),
+        ),
       ],
     );
   }
@@ -161,51 +147,72 @@ class _UserSongsPageState extends State<UserSongsPage> {
     return ValueListenableBuilder(
       valueListenable: currentSongsLength,
       builder: (_, value, __) {
+        final adInterval = 10;
+        final totalItems = value + (value ~/ adInterval);
+
         if (isLikedSongs) {
           return SliverReorderableList(
-            itemCount: songsList.length,
+            itemCount: totalItems,
             itemBuilder: (context, index) {
-              final song = songsList[index];
-              final borderRadius = getItemBorderRadius(index, songsList.length);
+              if (index > 0 && (index + 1) % (adInterval + 1) == 0) {
+                // Use adIndex to get different ads from the cache pool
+                final adIndexInList = (index ~/ (adInterval + 1));
+                return RepaintBoundary(
+                    key: ValueKey('ad_$index'), child: BannerAdWidget(adIndex: adIndexInList));
+              }
+              final songIndex = index - (index ~/ (adInterval + 1));
+              final song = songsList[songIndex];
+              final borderRadius = getItemBorderRadius(songIndex, songsList.length);
 
               return ReorderableDragStartListener(
                 enabled: _isEditEnabled,
                 key: Key(song['ytid'].toString()),
-                index: index,
+                index: songIndex,
                 child: _buildSongBar(
                   song,
-                  index,
+                  songIndex,
                   borderRadius,
                   playlist,
                   isRecentSong: isRecentlyPlayed,
                 ),
               );
             },
-            onReorder: (oldIndex, newIndex) {
+            onReorder: (int oldIndexWithAds, int newIndexWithAds) {
               setState(() {
-                if (oldIndex < newIndex) {
-                  newIndex -= 1;
+                // Convert indices to song indices
+                int oldSongIndex = oldIndexWithAds - (oldIndexWithAds ~/ (adInterval + 1));
+                int newSongIndex = newIndexWithAds - (newIndexWithAds ~/ (adInterval + 1));
+
+                if (oldSongIndex < newSongIndex) {
+                  // When moving down, the new index needs to be adjusted
+                  // if it crosses an ad boundary differently than the old one.
                 }
-                moveLikedSong(oldIndex, newIndex);
+                moveLikedSong(oldSongIndex, newSongIndex);
               });
             },
           );
         } else {
           return SliverList(
             delegate: SliverChildBuilderDelegate((context, index) {
-              final song = songsList[index];
-              song['isOffline'] = title == context.l10n!.offlineSongs;
-              final borderRadius = getItemBorderRadius(index, songsList.length);
+              if (index > 0 && (index + 1) % (adInterval + 1) == 0) {
+                final adIndexInList = (index ~/ (adInterval + 1));
+                return RepaintBoundary(child: BannerAdWidget(adIndex: adIndexInList));
+              }
+
+              final songIndex = index - (index ~/ (adInterval + 1));
+              if (songIndex >= songsList.length) return null; // Avoid range error
+              final songItem = songsList[songIndex];
+              songItem['isOffline'] = title == context.l10n!.offlineSongs;
+              final borderRadius = getItemBorderRadius(songIndex, songsList.length);
 
               return _buildSongBar(
-                song,
-                index,
+                songItem,
+                songIndex,
                 borderRadius,
                 playlist,
                 isRecentSong: isRecentlyPlayed,
               );
-              // ignore: require_trailing_commas
-            }, childCount: songsList.length),
+            }, childCount: totalItems),
           );
         }
       },

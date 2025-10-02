@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:j3tunes/extensions/l10n.dart';
 import 'package:j3tunes/utilities/common_variables.dart';
 import 'package:j3tunes/utilities/url_launcher.dart';
+import 'package:j3tunes/widgets/banner_ad_widget.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:share_plus/share_plus.dart';
@@ -45,6 +46,8 @@ class _AboutPageState extends State<AboutPage> {
             const SizedBox(height: 20),
             _buildExtraFeaturesSection(context),
             const SizedBox(height: 20),
+            const RepaintBoundary( child: BannerAdWidget(), ),
+             const SizedBox(height: 20),
           ],
         ),
       ),

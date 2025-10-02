@@ -1,26 +1,5 @@
 // ignore_for_file: unused_element, directives_ordering
 
-/*
- *     Copyright (C) 2025 Valeri Gokadze
- *
- *     J3Tunes is free software: you can redistribute it and/or modify
- *     it under the terms of the GNU General Public License as published by
- *     the Free Software Foundation, either version 3 of the License, or
- *     (at your option) any later version.
- *
- *     J3Tunes is distributed in the hope that it will be useful,
- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *     GNU General Public License for more details.
- *
- *     You should have received a copy of the GNU General Public License
- *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- *
- *     For more information about J3Tunes, including how to contribute,
- *     please visit: https://github.com/gokadzev/J3Tunes
- */
-
 import 'dart:math';
 import 'package:j3tunes/API/musify.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
@@ -36,6 +15,7 @@ import 'package:j3tunes/utilities/common_variables.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:j3tunes/utilities/playlist_image_picker.dart';
 import 'package:j3tunes/utilities/utils.dart';
+import 'package:j3tunes/widgets/banner_ad_widget.dart';
 import 'package:j3tunes/widgets/confirmation_dialog.dart';
 import 'package:j3tunes/widgets/playlist_bar.dart';
 import 'package:j3tunes/widgets/section_header.dart';
@@ -105,6 +85,9 @@ class _LibraryPageState extends State<LibraryPage> {
                       _buildUserPlaylistsSection(primaryColor),
                       if (!offlineMode.value)
                         _buildUserLikedPlaylistsSection(primaryColor),
+                    const RepaintBoundary(
+                        child: BannerAdWidget(),
+                      ),    
                     ],
                   ),
                 ),

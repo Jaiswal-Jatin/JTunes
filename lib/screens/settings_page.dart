@@ -39,6 +39,7 @@ import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:j3tunes/utilities/url_launcher.dart';
 import 'package:j3tunes/utilities/utils.dart';
 import 'package:j3tunes/services/auth_service.dart';
+import 'package:j3tunes/widgets/banner_ad_widget.dart';
 import 'package:j3tunes/widgets/bottom_sheet_bar.dart';
 import 'package:j3tunes/widgets/confirmation_dialog.dart';
 import 'package:j3tunes/widgets/custom_bar.dart';
@@ -90,6 +91,10 @@ class _SettingsPageState extends State<SettingsPage> {
             _buildOthersSection(context),
             _buildLogoutSection(context),
             const SizedBox(height: 20),
+            const RepaintBoundary(
+                        child: BannerAdWidget(),
+                      ),
+                       const SizedBox(height: 20),
           ],
         ),
       ),

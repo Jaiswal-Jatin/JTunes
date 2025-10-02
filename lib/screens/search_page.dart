@@ -1,26 +1,7 @@
 // ignore_for_file: unused_field, unnecessary_parenthesis, require_trailing_commas, prefer_const_constructors, prefer_int_literals, directives_ordering, prefer_final_fields, omit_local_variable_types, prefer_final_locals, avoid_redundant_argument_values
 
 import 'package:j3tunes/screens/playlist_page.dart';
-/*
- *     Copyright (C) 2025 Valeri Gokadze
- *
- *     J3Tunes is free software: you can redistribute it and/or modify
- *     it under the terms of the GNU General Public License as published by
- *     the Free Software Foundation, either version 3 of the License, or
- *     (at your option) any later version.
- *
- *     J3Tunes is distributed in the hope that it will be useful,
- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *     GNU General Public License for more details.
- *
- *     You should have received a copy of the GNU General Public License
- *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- *
- *     For more information about J3Tunes, including how to contribute,
- *     please visit: https://github.com/gokadzev/J3Tunes
- */
+
 
 import 'dart:async';
 
@@ -33,6 +14,7 @@ import 'package:j3tunes/services/data_manager.dart' as data_manager;
 import 'package:j3tunes/utilities/common_variables.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:j3tunes/utilities/utils.dart';
+import 'package:j3tunes/widgets/banner_ad_widget.dart';
 import 'package:j3tunes/widgets/confirmation_dialog.dart';
 import 'package:j3tunes/widgets/custom_bar.dart';
 import 'package:j3tunes/widgets/custom_search_bar.dart';
@@ -299,7 +281,11 @@ class _SearchPageState extends State<SearchPage> {
                 _buildInitialSearchBody(primaryColor),
               if (showSuggestions)
                 _buildEnhancedSuggestionsSection(primaryColor),
-              if (showResults) _buildSearchResults(primaryColor),
+              if (showResults)
+                _buildSearchResults(primaryColor),
+              const RepaintBoundary(
+                        child: BannerAdWidget(),
+                      ), 
             ],
           ),
         ),
@@ -587,24 +573,29 @@ class _SearchPageState extends State<SearchPage> {
               ),
             ),
             child: Column(
-              children: List.generate(
-                _songsSearchResult.length > maxResultsToShow
-                    ? maxResultsToShow
-                    : _songsSearchResult.length,
-                (index) {
-                  final borderRadius = getItemBorderRadius(
-                    index,
-                    _songsSearchResult.length > maxResultsToShow
-                        ? maxResultsToShow
-                        : _songsSearchResult.length,
-                  );
-                  final song = _songsSearchResult[index];
-                  final songWithImage = song is Map<String, dynamic>
-                      ? Map<String, dynamic>.from(song)
-                      : song;
-                  if (songWithImage is Map<String, dynamic> &&
-                      songWithImage['image'] != null) {
-                    songWithImage['lowResImage'] = songWithImage['image'];
+              children: List.generate(() {
+                final songCount = _songsSearchResult.length > maxResultsToShow ? maxResultsToShow : _songsSearchResult.length;
+                final adCount = (songCount / 10).floor();
+                return songCount + adCount;
+              }(), (index) {
+                const adInterval = 10;
+                if (index > 0 && (index + 1) % (adInterval + 1) == 0) {
+                  return const RepaintBoundary(child: BannerAdWidget());
+                }
+                final songIndex = index - (index ~/ (adInterval + 1));
+
+                final songCount = _songsSearchResult.length > maxResultsToShow ? maxResultsToShow : _songsSearchResult.length;
+                final borderRadius = getItemBorderRadius(
+                  songIndex,
+                  songCount,
+                );
+                final song = _songsSearchResult[songIndex];
+                final songWithImage = song is Map<String, dynamic>
+                    ? Map<String, dynamic>.from(song)
+                    : song;
+                if (songWithImage is Map<String, dynamic> &&
+                    songWithImage['image'] != null) {
+                  songWithImage['lowResImage'] = songWithImage['image'];
                   }
                   return SongBar(
                     songWithImage,
@@ -613,8 +604,7 @@ class _SearchPageState extends State<SearchPage> {
                     borderRadius: borderRadius,
                     backgroundColor: Colors.transparent,
                   );
-                },
-              ),
+              }),
             ),
           ),
         ],

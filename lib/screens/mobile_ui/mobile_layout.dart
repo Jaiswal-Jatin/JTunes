@@ -1,6 +1,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:j3tunes/utilities/common_variables.dart';
+import 'package:j3tunes/widgets/banner_ad_widget.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 import 'bottom_actions_row.dart';
@@ -58,6 +59,12 @@ class MobileLayout extends StatelessWidget {
             isVideoMode: isVideoMode,
           ),
         if (!isLargeScreen) ...[
+          // Ad Widget
+          const RepaintBoundary(
+            child: BannerAdWidget(),
+          ),
+          const SizedBox(height: 10),
+
           BottomActionsRow(
             context: context,
             audioId: metadata.extras?['ytid'],
