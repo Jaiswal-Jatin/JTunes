@@ -25,6 +25,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:j3tunes/services/router_service.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 
@@ -111,12 +112,19 @@ class _SplashScreenState extends State<SplashScreen>
     _particleController.repeat();
 
     // Navigate to home after total duration
-    Future.delayed(_splashDuration, _navigateToHome);
+    Future.delayed(_splashDuration, _checkAuthAndNavigate);
   }
 
-  void _navigateToHome() {
+  void _checkAuthAndNavigate() {
     if (mounted) {
-      NavigationManager.router.go('/home');
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // If user is logged in, go to home
+        NavigationManager.router.go('/home');
+      } else {
+        // If user is not logged in, go to login
+        NavigationManager.router.go('/login');
+      }
     }
   }
 

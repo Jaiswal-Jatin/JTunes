@@ -4,10 +4,14 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
+  cloud_firestore
   dynamic_color
   file_selector_windows
-  flutter_inappwebview_windows
+  firebase_auth
+  firebase_core
+  permission_handler_windows
   screen_retriever
+  share_plus
   url_launcher_windows
   window_manager
 )

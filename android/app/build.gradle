@@ -1,5 +1,8 @@
 plugins {
     id "com.android.application"
+    // START: FlutterFire Configuration
+    id 'com.google.gms.google-services'
+    // END: FlutterFire Configuration
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
 }
@@ -31,7 +34,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.jatin.J3Tunes"
-    compileSdk 35
+    compileSdk 36
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -54,7 +57,7 @@ android {
     defaultConfig {
         applicationId "com.jatin.J3Tunes"
         minSdk 24
-        targetSdk 35
+        targetSdk 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
@@ -98,7 +101,7 @@ android {
             
         }
         debug {
-            applicationIdSuffix '.debug'
+            // applicationIdSuffix '.debug'
             versionNameSuffix ' DEBUG'
         }
     }

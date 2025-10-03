@@ -6,6 +6,9 @@ import 'dart:io';
 // The window_manager package is required for setting the window size.
 // Add `window_manager: ^0.3.8` to your pubspec.yaml
 import 'package:home_widget/home_widget.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:j3tunes/firebase_options.dart';
 
 import 'package:j3tunes/API/musify.dart';
 import 'package:j3tunes/localization/app_localizations.dart';
@@ -21,7 +24,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:j3tunes/extensions/l10n.dart';
 import 'package:j3tunes/services/audio_service.dart';
 import 'package:j3tunes/services/data_manager.dart' hide addOrUpdateData;
-import 'package:j3tunes/services/io_service.dart';
+import 'package:j3tunes/services/io_service.dart'; // Removed 'hide FilePaths'
 import 'package:j3tunes/services/logger_service.dart';
 import 'package:j3tunes/services/playlist_sharing.dart';
 import 'package:j3tunes/services/router_service.dart';
@@ -31,10 +34,12 @@ import 'package:j3tunes/widgets/MusicWidgetProvider.dart';
 import 'package:j3tunes/style/app_themes.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:j3tunes/screens/adaptive_layout.dart';
 import 'package:j3tunes/screens/mobile_ui/bottom_navigation_page.dart';
 import 'package:j3tunes/screens/desktop_ui/desktop_scaffold.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:package_info_plus/package_info_plus.dart'; // Added for dynamic app version
 
 /// Global notifier for the currently selected song (for instant SongBar update)
 final ValueNotifier<Map<String, dynamic>?> currentSongNotifier = ValueNotifier<Map<String, dynamic>?>(null);
@@ -46,6 +51,7 @@ final appLinks = AppLinks();
 
 bool isFdroidBuild = false;
 bool isUpdateChecked = false;
+String? currentAppVersion; // Global variable to store the app version
 
 const appLanguages = <String, String>{
   'English': 'en',
@@ -158,15 +164,7 @@ class _J3TunesState extends State<J3Tunes> with WidgetsBindingObserver {
       logger.log('License Registration Error', e, stackTrace);
     }
 
-    if (!isFdroidBuild &&
-        !isUpdateChecked &&
-        !offlineMode.value &&
-        kReleaseMode) {
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        checkAppUpdates();
-        isUpdateChecked = true;
-      });
-    }
+    // Removed update check from here. It will now be handled by the HomePage.
   }
 
   @override
@@ -178,9 +176,8 @@ class _J3TunesState extends State<J3Tunes> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // App restart ke liye - splash screen se start hoga
-    if (_lastLifecycleState == AppLifecycleState.paused &&
-        state == AppLifecycleState.resumed) {
+    // When app resumes, always go to splash screen to re-check auth state and handle navigation.
+    if (state == AppLifecycleState.resumed && _lastLifecycleState == AppLifecycleState.paused) {
       NavigationManager.router.go('/splash');
     }
 
@@ -193,6 +190,9 @@ class _J3TunesState extends State<J3Tunes> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // NavigationManager().context is set by the GoRouter itself.
+    // No need to explicitly set it here.
+
     return DynamicColorBuilder(
       builder: (lightColorScheme, darkColorScheme) {
         final colorScheme = getAppColorScheme(
@@ -247,6 +247,23 @@ void backgroundCallback(Uri? uri) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  if (!isFdroidBuild) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    // FirebaseAuth.instance.useAuthEmulator('localhost', 9099); // Comment out if not using emulator
+  }
+  
+  // Initialize Hive and other services first
+  await initialisation();
+  // Check for app updates after initialization (now handled by HomePage)
+  // await checkAppUpdates(); // Removed as per plan
+
+  // Add these error handlers before runApp
+  FlutterError.onError = (FlutterErrorDetails details) {
+    logger.log('Flutter Error', details.exception, details.stack);
+  };
+
   // Set minimum window size for desktop platforms.
   if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
     await windowManager.ensureInitialized();
@@ -270,13 +287,6 @@ void main() async {
       await windowManager.focus();
     });
   }
-
-  await initialisation();
-
-  // Add these error handlers before runApp
-  FlutterError.onError = (FlutterErrorDetails details) {
-    logger.log('Flutter Error', details.exception, details.stack);
-  };
 
   PlatformDispatcher.instance.onError = (error, stack) {
     logger.log('Platform Error', error, stack);
@@ -329,8 +339,24 @@ Future<void> initialisation() async {
     logger.log('Initialization Error', e, stackTrace);
   }
 
+  // Get app version dynamically
+  final packageInfo = await PackageInfo.fromPlatform();
+  currentAppVersion = packageInfo.version;
+  logger.log('Current App Version: $currentAppVersion', null, null); // Added log
+
   applicationDirPath = (await getApplicationDocumentsDirectory()).path;
   await FilePaths.ensureDirectoriesExist();
+}
+Future<void> _handleFirstRun() async {
+  final prefs = await SharedPreferences.getInstance();
+  final bool hasRunBefore = prefs.getBool('hasRunBefore') ?? false;
+
+  if (!hasRunBefore) {
+    // This is the first run after install/reinstall.
+    // Sign out any lingering user to ensure a fresh start.
+    await FirebaseAuth.instance.signOut();
+    await prefs.setBool('hasRunBefore', true);
+  }
 }
 
 void handleIncomingLink(Uri? uri) async {

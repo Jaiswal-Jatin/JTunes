@@ -1,0 +1,15 @@
+{
+  "name": "jtunes-update-backend",
+  "version": "1.0.0",
+  "description": "Backend for J3Tunes app update checks",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}

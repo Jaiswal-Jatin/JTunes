@@ -4,6 +4,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:j3tunes/models/user_model.dart';
+import 'package:j3tunes/services/auth_service.dart';
+import 'package:j3tunes/services/router_service.dart';
 import 'package:j3tunes/screens/user_profile_page.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,82 +14,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
 class UserProfile {
-  final String name;
-  final String email;
-  final String? profileImagePath;
-  final DateTime createdAt;
-
-  UserProfile({
-    required this.name,
-    required this.email,
-    this.profileImagePath,
-    required this.createdAt,
-  });
-
-  Map<String, dynamic> toJson() => {
-        'name': name,
-        'email': email,
-        'profileImagePath': profileImagePath,
-        'createdAt': createdAt.toIso8601String(),
-      };
-
-  factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
-        name: json['name'] ?? 'Music Lover',
-        email: json['email'] ?? '',
-        profileImagePath: json['profileImagePath'],
-        createdAt: DateTime.parse(
-            json['createdAt'] ?? DateTime.now().toIso8601String()),
-      );
-}
-
-class UserProfileService {
-  static const String _profileKey = 'user_profile';
-  static UserProfile? _cachedProfile;
-
-  static Future<UserProfile> getUserProfile() async {
-    if (_cachedProfile != null) return _cachedProfile!;
-
-    final prefs = await SharedPreferences.getInstance();
-    final profileJson = prefs.getString(_profileKey);
-
-    if (profileJson != null) {
-      _cachedProfile = UserProfile.fromJson(json.decode(profileJson));
-    } else {
-      _cachedProfile = UserProfile(
-        name: 'Music Lover',
-        email: '',
-        createdAt: DateTime.now(),
-      );
-    }
-
-    return _cachedProfile!;
-  }
-
-  static Future<void> saveUserProfile(UserProfile profile) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_profileKey, json.encode(profile.toJson()));
-    _cachedProfile = profile;
-  }
-
-  static Future<String?> saveProfileImage(XFile imageFile) async {
-    try {
-      final appDir = await getApplicationDocumentsDirectory();
-      final profileImageDir = Directory('${appDir.path}/profile_images');
-
-      if (!await profileImageDir.exists()) {
-        await profileImageDir.create(recursive: true);
-      }
-
-      final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final savedImage = File('${profileImageDir.path}/$fileName');
-
-      await File(imageFile.path).copy(savedImage.path);
-      return savedImage.path;
-    } catch (e) {
-      return null;
-    }
-  }
-
   static String getGreeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'Good Morning';
@@ -111,7 +38,7 @@ class UserProfileCard extends StatefulWidget {
 }
 
 class _UserProfileCardState extends State<UserProfileCard> {
-  UserProfile? userProfile;
+  UserModel? userProfile;
 
   @override
   void initState() {
@@ -120,7 +47,7 @@ class _UserProfileCardState extends State<UserProfileCard> {
   }
 
   Future<void> _loadUserProfile() async {
-    final profile = await UserProfileService.getUserProfile();
+    final profile = await AuthService().getUserDetails();
     if (mounted) {
       setState(() {
         userProfile = profile;
@@ -139,12 +66,7 @@ class _UserProfileCardState extends State<UserProfileCard> {
 
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const UserProfilePage(),
-          ),
-        ).then((_) => _loadUserProfile()); // Refresh after returning
+        NavigationManager.router.push(NavigationManager.profilePath).then((_) => _loadUserProfile());
       },
       child: Container(
         padding: EdgeInsets.all(widget.isCompact ? 12 : 16),
@@ -180,7 +102,7 @@ class _UserProfileCardState extends State<UserProfileCard> {
                 children: [
                   if (widget.showGreeting) ...[
                     Text(
-                      UserProfileService.getGreeting(),
+                      getGreeting(),
                       style: TextStyle(
                         fontSize: widget.isCompact ? 12 : 14,
                         color: theme.colorScheme.onPrimaryContainer
@@ -244,7 +166,7 @@ class _UserProfileCardState extends State<UserProfileCard> {
       ),
       child: ClipOval(
         child: userProfile!.profileImagePath != null &&
-                File(userProfile!.profileImagePath!).existsSync()
+                File(userProfile!.profileImagePath!).existsSync() // This check is for local files
             ? Image.file(
                 File(userProfile!.profileImagePath!),
                 fit: BoxFit.cover,
@@ -259,5 +181,13 @@ class _UserProfileCardState extends State<UserProfileCard> {
               ),
       ),
     );
+  }
+
+  String getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    if (hour < 21) return 'Good Evening';
+    return 'Good Night';
   }
 }

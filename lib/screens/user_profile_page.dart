@@ -1,12 +1,16 @@
 // ignore_for_file: use_colored_box, deprecated_member_use, require_trailing_commas, omit_local_variable_types
 
 import 'dart:io';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:j3tunes/models/user_model.dart';
+import 'package:j3tunes/services/auth_service.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
-import 'package:j3tunes/widgets/user_profile_card.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart';
+
 
 class UserProfilePage extends StatefulWidget {
   const UserProfilePage({super.key});
@@ -19,8 +23,11 @@ class _UserProfilePageState extends State<UserProfilePage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _mobileController = TextEditingController();
+  final _addressController = TextEditingController();
+  DateTime? _selectedDate;
 
-  UserProfile? userProfile;
+  UserModel? userProfile;
   String? selectedImagePath;
   bool isLoading = false;
 
@@ -31,12 +38,15 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   Future<void> _loadUserProfile() async {
-    final profile = await UserProfileService.getUserProfile();
+    final profile = await AuthService().getUserDetails();
     setState(() {
       userProfile = profile;
-      _nameController.text = profile.name;
-      _emailController.text = profile.email;
-      selectedImagePath = profile.profileImagePath;
+      _nameController.text = profile?.name ?? '';
+      _emailController.text = profile?.email ?? '';
+      _mobileController.text = profile?.mobile ?? '';
+      _addressController.text = profile?.address ?? '';
+      _selectedDate = profile?.dob;
+      selectedImagePath = profile?.profileImagePath;
     });
   }
 
@@ -54,7 +64,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
         isLoading = true;
       });
 
-      final savedPath = await UserProfileService.saveProfileImage(image);
+      final savedPath = await _saveProfileImage(image);
 
       setState(() {
         selectedImagePath = savedPath;
@@ -67,21 +77,41 @@ class _UserProfilePageState extends State<UserProfilePage> {
     }
   }
 
+  Future<String?> _saveProfileImage(XFile imageFile) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final profileImageDir = Directory('${appDir.path}/profile_images');
+
+      if (!await profileImageDir.exists()) {
+        await profileImageDir.create(recursive: true);
+      }
+
+      final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final savedImage = File('${profileImageDir.path}/$fileName');
+
+      await File(imageFile.path).copy(savedImage.path);
+      return savedImage.path;
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
+    if (userProfile == null) return;
 
     setState(() {
       isLoading = true;
     });
 
-    final updatedProfile = UserProfile(
+    final updatedProfile = userProfile!.copyWith(
       name: _nameController.text.trim(),
-      email: _emailController.text.trim(),
+      mobile: _mobileController.text.trim(),
+      address: _addressController.text.trim(),
+      dob: _selectedDate,
       profileImagePath: selectedImagePath,
-      createdAt: userProfile?.createdAt ?? DateTime.now(),
     );
-
-    await UserProfileService.saveUserProfile(updatedProfile);
+    await AuthService().updateUserProfile(updatedProfile);
 
     setState(() {
       isLoading = false;
@@ -89,6 +119,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
     showToast(context, 'Profile updated successfully!');
     Navigator.pop(context);
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
   }
 
   @override
@@ -195,21 +239,82 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     const SizedBox(height: 20),
 
                     // Email Field
-                    TextFormField(
+                     TextFormField(
                       controller: _emailController,
+                      readOnly: true, // Email is not editable
                       decoration: InputDecoration(
-                        labelText: 'Email (Optional)',
+                        labelText: 'Email',
                         prefixIcon: const Icon(FluentIcons.mail_24_regular),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
+                        fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                        filled: true,
                       ),
-                      keyboardType: TextInputType.emailAddress,
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Mobile Field
+                    TextFormField(
+                      controller: _mobileController,
+                      decoration: InputDecoration(
+                        labelText: 'Mobile',
+                        prefixIcon: const Icon(FluentIcons.phone_24_regular),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      keyboardType: TextInputType.phone,
                       validator: (value) {
-                        if (value != null &&
-                            value.isNotEmpty &&
-                            !value.contains('@')) {
-                          return 'Please enter a valid email';
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter your mobile number';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Address Field
+                    TextFormField(
+                      controller: _addressController,
+                      decoration: InputDecoration(
+                        labelText: 'Address',
+                        prefixIcon: const Icon(FluentIcons.location_24_regular),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter your address';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // DOB Field
+                    TextFormField(
+                      readOnly: true,
+                      controller: TextEditingController(
+                        text: _selectedDate == null
+                            ? ''
+                            : DateFormat.yMMMd().format(_selectedDate!),
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Date of Birth',
+                        prefixIcon: const Icon(Icons.calendar_today_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onTap: () => _selectDate(context),
+                      validator: (value) {
+                        if (_selectedDate == null) {
+                          return 'Please select your date of birth';
                         }
                         return null;
                       },
@@ -277,7 +382,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
               Flexible(
                 child: _buildStatItem(
                   'Member Since',
-                  _formatDate(userProfile!.createdAt),
+                  _formatDate(userProfile!.dob), // Using dob as a placeholder for creation date
                   FluentIcons.calendar_24_regular,
                 ),
               ),
@@ -326,27 +431,16 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   String _formatDate(DateTime date) {
-    final months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
-    ];
-    return '${months[date.month - 1]} ${date.year}';
+    return DateFormat.yMMMd().format(date);
   }
 
   int _calculateProfileCompletion() {
-    int completion = 40; // Base for having a name
-    if (userProfile!.email.isNotEmpty) completion += 30;
-    if (userProfile!.profileImagePath != null) completion += 30;
+    if (userProfile == null) return 0;
+    int completion = 20; // Base for existing account
+    if (userProfile!.name.isNotEmpty) completion += 20;
+    if (userProfile!.mobile.isNotEmpty) completion += 20;
+    if (userProfile!.address.isNotEmpty) completion += 20;
+    if (userProfile!.profileImagePath != null) completion += 20;
     return completion;
   }
 
@@ -354,6 +448,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _mobileController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 }

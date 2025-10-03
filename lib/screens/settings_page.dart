@@ -38,6 +38,7 @@ import 'package:j3tunes/utilities/flutter_bottom_sheet.dart';
 import 'package:j3tunes/utilities/flutter_toast.dart';
 import 'package:j3tunes/utilities/url_launcher.dart';
 import 'package:j3tunes/utilities/utils.dart';
+import 'package:j3tunes/services/auth_service.dart';
 import 'package:j3tunes/widgets/bottom_sheet_bar.dart';
 import 'package:j3tunes/widgets/confirmation_dialog.dart';
 import 'package:j3tunes/widgets/custom_bar.dart';
@@ -87,6 +88,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 primaryColor,
               ),
             _buildOthersSection(context),
+            _buildLogoutSection(context),
             const SizedBox(height: 20),
           ],
         ),
@@ -185,6 +187,8 @@ class _SettingsPageState extends State<SettingsPage> {
             return CustomBar(
               context.l10n!.backgroundPlay,
               FluentIcons.dual_screen_tablet_24_filled,
+                         borderRadius: commonCustomBarRadiusLast,
+
               trailing: Switch(
                 value: value,
                 onChanged: (value) => _toggleBackgroundPlay(context, value),
@@ -274,18 +278,19 @@ class _SettingsPageState extends State<SettingsPage> {
         CustomBar(
           context.l10n!.restoreUserData,
           FluentIcons.cloud_add_24_filled,
+          //  borderRadius: commonCustomBarRadiusLast,
           onTap: () async {
             final response = await restoreData(context);
             showToast(context, response);
           },
         ),
-        // if (!isFdroidBuild)
-        //   CustomBar(
-        //     context.l10n!.downloadAppUpdate,
-        //     FluentIcons.arrow_download_24_filled,
-        //     borderRadius: commonCustomBarRadiusLast,
-        //     onTap: checkAppUpdates,
-        //   ),
+        if (!isFdroidBuild)
+          CustomBar(
+            context.l10n!.downloadAppUpdate,
+            FluentIcons.arrow_download_24_filled,
+            borderRadius: commonCustomBarRadiusLast,
+            onTap: () => checkAppUpdates( showNoUpdateMessage: true),
+          ),
       ],
     );
   }
@@ -311,12 +316,12 @@ class _SettingsPageState extends State<SettingsPage> {
     return Column(
       children: [
         SectionHeader(title: context.l10n!.others),
-        // CustomBar(
-        //   context.l10n!.licenses,
-        //   FluentIcons.document_24_filled,
-        //   borderRadius: commonCustomBarRadiusFirst,
-        //   onTap: () => NavigationManager.router.go('/settings/license'),
-        // ),
+        CustomBar(
+          context.l10n!.licenses,
+          FluentIcons.document_24_filled,
+          borderRadius: commonCustomBarRadiusFirst,
+          onTap: () => NavigationManager.router.go('/settings/license'),
+        ),
         // CustomBar(
         //   '${context.l10n!.copyLogs} (${logger.getLogCount()})',
         //   FluentIcons.error_circle_24_filled,
@@ -327,6 +332,21 @@ class _SettingsPageState extends State<SettingsPage> {
           FluentIcons.book_information_24_filled,
           borderRadius: commonCustomBarRadiusLast,
           onTap: () => NavigationManager.router.go('/settings/about'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLogoutSection(BuildContext context) {
+    return Column(
+      children: [
+        SectionHeader(title: 'Account'),
+        CustomBar(
+          'Logout',
+          FluentIcons.sign_out_24_regular,
+          borderRadius: commonCustomBarRadius,
+          onTap: () => AuthService().signOut(context),
+          textColor: Theme.of(context).colorScheme.error,
         ),
       ],
     );

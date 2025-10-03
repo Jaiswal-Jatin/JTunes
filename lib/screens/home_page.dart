@@ -11,7 +11,9 @@ import 'package:j3tunes/extensions/l10n.dart';
 import 'package:j3tunes/main.dart';
 import 'package:j3tunes/screens/playlist_page.dart';
 import 'package:j3tunes/services/router_service.dart';
+import 'package:flutter/scheduler.dart'; // Added for SchedulerBinding
 import 'package:j3tunes/services/settings_manager.dart';
+import 'package:j3tunes/services/update_manager.dart'; // Added for checkAppUpdates
 import 'package:j3tunes/utilities/common_variables.dart';
 import 'package:j3tunes/utilities/utils.dart';
 import 'package:j3tunes/widgets/playlist_cube.dart';
@@ -126,6 +128,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage>
     with AutomaticKeepAliveClientMixin {
+  static bool _updateCheckPerformed = false; // Flag to ensure update check runs only once
+
   // Keep the page alive to avoid rebuilding
   String? _getRandomPlaylistImage(List<dynamic> songs) {
     if (songs.isEmpty) return null;
@@ -163,6 +167,16 @@ class _HomePageState extends State<HomePage>
     audioHandler.mediaItem.listen(_onMediaItemChanged);
     currentLikedPlaylistsLength.addListener(_refreshLikedPlaylists);
     _onMediaItemChanged(audioHandler.mediaItem.value);
+
+    // Trigger update check only after the Home screen is fully loaded
+    if (!isFdroidBuild && !_updateCheckPerformed) {
+      SchedulerBinding.instance.addPostFrameCallback((_) async {
+        if (mounted) { // Ensure the widget is still mounted before showing dialogs
+          await checkAppUpdates(); // Pass context
+          _updateCheckPerformed = true;
+        }
+      });
+    }
   }
 
   @override
