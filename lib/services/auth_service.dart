@@ -117,8 +117,8 @@ class AuthService {
   Future<String?> signInWithGoogle() async {
     print('[AuthService] Starting Google Sign-In flow.');
     try {
-      print('[AuthService] Calling GoogleSignIn.instance.signIn()');
-      final GoogleSignInAccount? googleUser = await GoogleSignIn.instance.authenticate();
+      print('[AuthService] Calling GoogleSignIn().signIn()');
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
       if (googleUser == null) {
         print('[AuthService] Google sign in was cancelled by the user.');
         return 'Google sign in was cancelled.';
@@ -129,7 +129,7 @@ class AuthService {
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: null, // accessToken is no longer directly available from GoogleSignInAuthentication in v7.x
+        accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
