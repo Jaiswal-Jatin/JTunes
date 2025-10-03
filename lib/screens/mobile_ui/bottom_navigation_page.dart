@@ -101,6 +101,66 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
     }
   }
 
+  void _handleTabTap(int index) {
+    final currentIndex = widget.child.currentIndex;
+    final isActive = index == currentIndex;
+
+    // Map bottom nav index to the corresponding navigator key
+    GlobalKey<NavigatorState>? branchKey;
+    if (!offlineMode.value) {
+      switch (index) {
+        case 0:
+          branchKey = NavigationManager.homeTabNavigatorKey;
+          break;
+        case 1:
+          branchKey = NavigationManager.searchTabNavigatorKey;
+          break;
+        case 2:
+          branchKey = NavigationManager.libraryTabNavigatorKey;
+          break;
+        case 3:
+          branchKey = NavigationManager.settingsTabNavigatorKey;
+          break;
+      }
+    } else {
+      // Offline mode has fewer tabs (Home, Library, Settings)
+      switch (index) {
+        case 0:
+          branchKey = NavigationManager.homeTabNavigatorKey;
+          break;
+        case 1:
+          branchKey = NavigationManager.libraryTabNavigatorKey;
+          break;
+        case 2:
+          branchKey = NavigationManager.settingsTabNavigatorKey;
+          break;
+      }
+    }
+
+    if (isActive) {
+      // If user tapped the already active tab, pop that tab's navigator to its first route
+      try {
+        branchKey?.currentState?.popUntil((route) => route.isFirst);
+      } catch (_) {
+        // ignore - navigator might not be ready
+      }
+
+      // Special-case search tab: refresh/clear results when re-tapping
+      if (!offlineMode.value && index == 1) {
+        NavigationManager.router.go('/search');
+        if (searchPageKey.currentState != null) {
+          (searchPageKey.currentState as dynamic).clearSearchResults();
+        }
+      }
+    }
+
+    // Finally, tell the shell to go to the branch. Keep initialLocation true when re-tapping.
+    widget.child.goBranch(
+      index,
+      initialLocation: isActive,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -124,10 +184,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                       .toList(),
                   selectedIndex: widget.child.currentIndex,
                   onDestinationSelected: (index) {
-                    widget.child.goBranch(
-                      index,
-                      initialLocation: index == widget.child.currentIndex,
-                    );
+                    _handleTabTap(index);
                   },
                 ),
               Expanded(
@@ -166,10 +223,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                       ? NavigationDestinationLabelBehavior.onlyShowSelected
                       : NavigationDestinationLabelBehavior.alwaysHide,
                   onDestinationSelected: (index) {
-                    widget.child.goBranch(
-                      index,
-                      initialLocation: index == widget.child.currentIndex,
-                    );
+                    _handleTabTap(index);
                   },
                   destinations: _getNavigationDestinations(context),
                 )

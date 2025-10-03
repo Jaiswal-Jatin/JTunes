@@ -9,8 +9,9 @@ list(APPEND FLUTTER_PLUGIN_LIST
   file_selector_windows
   firebase_auth
   firebase_core
+  flutter_inappwebview_windows
   permission_handler_windows
-  screen_retriever
+  screen_retriever_windows
   share_plus
   url_launcher_windows
   window_manager

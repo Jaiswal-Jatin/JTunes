@@ -171,8 +171,8 @@ class _AboutPageState extends State<AboutPage> {
               const Divider(height: 1),
               ListTile(
                 leading: const Icon(FluentIcons.mail_24_regular),
-                title: const Text('jatinjaiswal2002@gmail.com'),
-                onTap: () => _launchURL('mailto:jatinjaiswal2002@gmail.com'),
+                title: const Text('jaiswaljatin47@gmail.com'),
+                onTap: () => _launchURL('mailto:jaiswaljatin47@gmail.com'),
               ),
               const Divider(height: 1),
               // ListTile(
